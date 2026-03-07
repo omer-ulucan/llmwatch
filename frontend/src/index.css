@@ -1,0 +1,117 @@
+/**
+ * Module: index.css
+ * Purpose: Tailwind v4 theme configuration and CSS utilities.
+ * WHY: Tailwind v4 moves away from tailwind.config.js towards pure CSS configurations.
+ * We inject custom colors and Framer Motion hooks directly here to build an Awwwards-level design system.
+ */
+@import "tailwindcss";
+@import "tailwindcss-animate";
+
+/* Custom Theme Variables (Awwwards-level premium dark mode) */
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  /* Base Colors */
+  --color-background: #030712; /* Deep near black */
+  --color-foreground: #f8fafc;
+  --color-card: #0a0f1e;
+  --color-card-border: rgba(255, 255, 255, 0.06);
+
+  /* Brand Colors */
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-glow: rgba(59, 130, 246, 0.5);
+  
+  --color-secondary: #8b5cf6;
+  --color-secondary-hover: #7c3aed;
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-error: #f43f5e;
+  --color-error-bg: rgba(244, 63, 94, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+
+  /* Structural Colors */
+  --color-muted: #1e293b;
+  --color-muted-foreground: #94a3b8;
+  --color-border: #1e293b;
+  --color-input: #1e293b;
+  --color-ring: #3b82f6;
+
+  /* Custom Animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-gradient: gradient-flow 15s ease infinite;
+  
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  @keyframes gradient-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}
+
+/* Global Styles */
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Base Utilities */
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-card-border shadow-2xl;
+  }
+  
+  .glass-card {
+    @apply bg-white/[0.02] backdrop-blur-md border border-white/[0.04] transition-all duration-300;
+  }
+  
+  .glass-card:hover {
+    @apply border-white/[0.08] shadow-[inset_0_0_20px_rgba(255,255,255,0.02)];
+  }
+
+  /* Animated background mesh gradient used heavily in login / dashboard */
+  .bg-mesh {
+    background: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+    background-size: 200% 200%;
+    animation: var(--animate-gradient);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+  }
+
+  .glow-effect {
+    box-shadow: 0 0 20px var(--color-primary-glow);
+  }
+}
+
+/* Custom Thin Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-muted rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground;
+}
