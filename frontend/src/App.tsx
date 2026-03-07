@@ -1,19 +1,41 @@
 /**
  * Component: App
- * Purpose: Outermost component wrapper.
- * WHY: Sets up context providers and routing boundaries. Real routing defined in Epoch 5.
+ * Purpose: Outermost component wrapper initializing the Router.
+ * WHY: React Router v7 data API is essential for loaders, actions, and layouts.
  */
 import React from 'react';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router';
+import Layout from '@/routes/_layout';
+import Login from '@/routes/login';
+import Dashboard from '@/routes/dashboard';
+import Chat from '@/routes/chat';
+import Analytics from '@/routes/analytics';
+import Settings from '@/routes/settings';
+
+const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { path: "dashboard", element: <Dashboard /> },
+      { path: "chat", element: <Chat /> },
+      { path: "analytics", element: <Analytics /> },
+      { path: "settings", element: <Settings /> },
+    ],
+  },
+  {
+    path: "*",
+    element: <Navigate to="/dashboard" replace />
+  }
+]);
 
 const App: React.FC = () => {
-  return (
-    <div className="min-h-screen bg-background bg-mesh text-foreground font-sans flex items-center justify-center">
-      <div className="glass-panel p-12 rounded-2xl max-w-lg text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-gradient mb-4">LLMWatch Engine</h1>
-        <p className="text-muted-foreground">Frontend scaffolded successfully. Routes injecting soon.</p>
-      </div>
-    </div>
-  );
+  return <RouterProvider router={router} />;
 };
 
 export default App;
