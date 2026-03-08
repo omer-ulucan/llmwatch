@@ -14,29 +14,38 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -e
+
+            echo "=== Ensuring ~/llmwatch is a git repo ==="
+            if [ ! -d ~/llmwatch/.git ]; then
+              echo "Not a git repo — cloning fresh (preserving .env files)"
+              ENV_BACKUP=$(mktemp -d)
+              [ -f ~/llmwatch/backend/.env ] && cp ~/llmwatch/backend/.env "$ENV_BACKUP/backend.env" && echo "Backed up backend/.env"
+              [ -f ~/llmwatch/frontend/.env ] && cp ~/llmwatch/frontend/.env "$ENV_BACKUP/frontend.env" && echo "Backed up frontend/.env"
+
+              rm -rf ~/llmwatch
+              git clone https://github.com/omer-ulucan/llmwatch.git ~/llmwatch
+
+              [ -f "$ENV_BACKUP/backend.env" ] && cp "$ENV_BACKUP/backend.env" ~/llmwatch/backend/.env && echo "Restored backend/.env"
+              [ -f "$ENV_BACKUP/frontend.env" ] && cp "$ENV_BACKUP/frontend.env" ~/llmwatch/frontend/.env && echo "Restored frontend/.env"
+              rm -rf "$ENV_BACKUP"
+            fi
+
             cd ~/llmwatch
 
-            echo "=== Git state before reset ==="
-            git status --short
-            git log --oneline -1
-
-            echo "=== Force-resetting to origin/main ==="
+            echo "=== Syncing to origin/main ==="
             git fetch origin main
             git reset --hard origin/main
-
-            echo "=== Git state after reset ==="
             git log --oneline -3
 
-            echo "=== Verifying nginx.conf has /api proxy block ==="
+            echo "=== Verifying critical files ==="
             grep "proxy_pass" frontend/nginx.conf
-
-            echo "=== Verifying client.ts has /api baseURL ==="
             grep "baseURL" frontend/src/api/client.ts
 
             echo "=== Stopping containers ==="
-            docker-compose down
+            docker-compose down || true
 
             echo "=== Building images (no cache) ==="
             docker-compose build --no-cache
@@ -47,22 +56,19 @@ jobs:
             echo "=== Container status ==="
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
-            echo "=== Waiting for backend startup ==="
-            sleep 8
+            echo "=== Waiting for startup ==="
+            sleep 10
 
             echo "=== Testing nginx /api proxy ==="
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health)
-            echo "Proxy health check status: $STATUS"
+            echo "Proxy health check: $STATUS"
             if [ "$STATUS" != "200" ]; then
-              echo "ERROR: /api proxy returned $STATUS, expected 200"
-              echo "=== Frontend container logs ==="
-              docker-compose logs --tail=30 frontend
-              echo "=== Backend container logs ==="
-              docker-compose logs --tail=30 backend
+              echo "FAIL — dumping logs"
+              docker-compose logs --tail=40 frontend
+              docker-compose logs --tail=40 backend
               exit 1
             fi
 
-            BODY=$(curl -s http://localhost:3000/api/health)
-            echo "Proxy health check body: $BODY"
-
+            curl -s http://localhost:3000/api/health
+            echo ""
             echo "=== Deploy complete ==="
