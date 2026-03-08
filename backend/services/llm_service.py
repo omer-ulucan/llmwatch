@@ -35,9 +35,12 @@ class QwenStrategy(LLMStrategy):
 
     def __init__(self):
         # WHY: vLLM exposes an OpenAI-compatible API, allowing us to use standard OpenAI clients
+        # openai_api_key is kept optional at config level. Some self-hosted/proxied
+        # vLLM deployments (e.g. private network, gateway-authenticated) don't require
+        # per-request API keys, but the OpenAI client still expects a non-empty value.
         self.client = ChatOpenAI(
             openai_api_base=settings.qwen_base_url,
-            openai_api_key=settings.qwen_api_key,
+            openai_api_key=settings.qwen_api_key or "not-needed",
             model_name="qwen3.5-35b-a3b",  # Using placeholder name based on prompt
         )
 
@@ -155,8 +158,9 @@ class LLMService:
 
     def __init__(self):
         self.strategies: Dict[str, LLMStrategy] = {"gemini": GeminiStrategy()}
-        # Only register Qwen if a real base URL is configured
-        if settings.qwen_base_url and settings.qwen_api_key:
+        # Register Qwen whenever a base URL is configured.
+        # API key is optional for self-hosted or gateway-authenticated deployments.
+        if settings.qwen_base_url:
             try:
                 self.strategies["qwen"] = QwenStrategy()
             except Exception as e:
