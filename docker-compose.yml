@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   backend:
     build: ./backend
@@ -8,14 +7,15 @@ services:
     depends_on:
       - mlflow
     env_file: .env
-
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://3.236.50.182:8000
     ports:
       - "3000:80"
     depends_on:
       - backend
-
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.11.1
     ports:
@@ -28,6 +28,5 @@ services:
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --default-artifact-root /mlflow-artifacts
       --host 0.0.0.0
-
 volumes:
   mlflow_data:
