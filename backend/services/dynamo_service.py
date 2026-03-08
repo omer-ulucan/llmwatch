@@ -263,9 +263,15 @@ class DynamoDBService:
             raise DatabaseException("Failed to retrieve agent trace.")
 
 
-dynamo_service = DynamoDBService()
+# WHY: Lazy initialization avoids connecting to DynamoDB at import time.
+# In demo mode or during tests, the service may never be needed, so
+# eagerly creating it would cause unnecessary boto3 client errors.
+_dynamo_service: Optional[DynamoDBService] = None
 
 
 def get_dynamo_service() -> DynamoDBService:
-    """Lazy factory for DynamoDBService. Enables easy mocking in tests."""
-    return dynamo_service
+    """Lazy singleton factory for DynamoDBService. Enables easy mocking in tests."""
+    global _dynamo_service
+    if _dynamo_service is None:
+        _dynamo_service = DynamoDBService()
+    return _dynamo_service
