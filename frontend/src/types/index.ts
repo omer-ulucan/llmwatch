@@ -103,3 +103,24 @@ export interface AgentAnalytics {
   tool_usage: Record<string, number>;
   model_breakdown: Record<string, number>;
 }
+
+
+// ── API Key Types ────────────────────────────────────────
+
+export interface ApiKey {
+  key_id: string;
+  name: string;
+  prefix: string;
+  created_at: string;
+  last_used_at?: string;
+  request_count: number;
+  is_active: boolean;
+}
+
+export interface CreateApiKeyResponse {
+  key_id: string;
+  name: string;
+  raw_key: string;
+  prefix: string;
+  created_at: string;
+}
