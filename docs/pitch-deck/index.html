@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLMWatch — Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.min.css">
+<style>
+  :root {
+    --bg: #050a18;
+    --card: #0a0f1e;
+    --border: rgba(255,255,255,0.06);
+    --primary: #3b82f6;
+    --primary-glow: rgba(59,130,246,0.4);
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #f43f5e;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --gradient: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+  }
+
+  .reveal-viewport { background: var(--bg); }
+
+  .reveal {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 32px;
+    color: var(--text);
+  }
+
+  .reveal .slides section {
+    text-align: left;
+    padding: 40px 60px;
+  }
+
+  .reveal h1, .reveal h2, .reveal h3 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    text-transform: none;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+
+  .reveal h1 { font-size: 3.2em; }
+  .reveal h2 { font-size: 2em; margin-bottom: 0.6em; }
+  .reveal h3 { font-size: 1.3em; color: var(--muted); font-weight: 600; }
+
+  .gradient-text {
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .reveal p { color: var(--muted); line-height: 1.6; font-size: 0.75em; }
+  .reveal li { color: var(--muted); line-height: 1.5; font-size: 0.65em; margin-bottom: 0.4em; }
+  .reveal strong { color: var(--text); font-weight: 700; }
+  .reveal em { color: var(--primary); font-style: normal; font-weight: 600; }
+
+  /* Glass card */
+  .glass {
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin: 12px 0;
+  }
+
+  .glass-sm {
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 8px 0;
+  }
+
+  /* Feature grid */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .feature-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    transition: border-color 0.3s;
+  }
+
+  .feature-card:hover { border-color: var(--primary); }
+
+  .feature-card .icon {
+    font-size: 1.4em;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .feature-card h4 {
+    font-size: 0.7em;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 6px 0;
+  }
+
+  .feature-card p {
+    font-size: 0.5em !important;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: flex;
+    gap: 20px;
+    margin-top: 24px;
+  }
+
+  .stat-card {
+    flex: 1;
+    text-align: center;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 16px;
+  }
+
+  .stat-card .number {
+    font-size: 1.8em;
+    font-weight: 900;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: block;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-card .label {
+    font-size: 0.5em;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  /* Comparison table */
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.5em;
+    margin-top: 16px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .compare-table th {
+    background: rgba(59,130,246,0.15);
+    color: var(--text);
+    font-weight: 700;
+    padding: 14px 12px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .compare-table th:first-child { text-align: left; }
+
+  .compare-table td {
+    padding: 10px 12px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--muted);
+  }
+
+  .compare-table td:first-child {
+    text-align: left;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .compare-table tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .compare-table tr:hover td { background: rgba(59,130,246,0.05); }
+
+  .compare-table .yes { color: var(--success); font-weight: 700; }
+  .compare-table .no { color: var(--error); opacity: 0.6; }
+  .compare-table .partial { color: var(--warning); }
+  .compare-table .llmwatch { background: rgba(59,130,246,0.08) !important; }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .arch-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .arch-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 24px;
+    text-align: center;
+    min-width: 140px;
+  }
+
+  .arch-box.highlight {
+    border-color: var(--primary);
+    box-shadow: 0 0 20px var(--primary-glow);
+  }
+
+  .arch-box .arch-label {
+    font-size: 0.6em;
+    font-weight: 700;
+    color: var(--text);
+    display: block;
+  }
+
+  .arch-box .arch-sub {
+    font-size: 0.42em;
+    color: var(--muted);
+    display: block;
+    margin-top: 2px;
+  }
+
+  .arch-arrow {
+    font-size: 1.2em;
+    color: var(--primary);
+    text-align: center;
+  }
+
+  /* Code block */
+  .code-block {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.48em;
+    color: var(--muted);
+    line-height: 1.6;
+    overflow-x: auto;
+    margin-top: 16px;
+  }
+
+  .code-block .keyword { color: #c084fc; }
+  .code-block .string { color: #34d399; }
+  .code-block .comment { color: #475569; }
+  .code-block .url { color: #60a5fa; }
+  .code-block .header { color: #f59e0b; }
+
+  /* Tag / badge */
+  .tag {
+    display: inline-block;
+    font-size: 0.45em;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin: 2px 4px;
+  }
+
+  .tag-blue { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .tag-green { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+  .tag-purple { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+  .tag-orange { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+  .tag-pink { background: rgba(236,72,153,0.15); color: #f472b6; border: 1px solid rgba(236,72,153,0.3); }
+
+  /* Pain point cards */
+  .pain-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .pain-card {
+    background: rgba(244,63,94,0.05);
+    border: 1px solid rgba(244,63,94,0.15);
+    border-radius: 14px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .pain-card .pain-icon { font-size: 1.6em; margin-bottom: 10px; display: block; }
+  .pain-card h4 { font-size: 0.65em; font-weight: 700; color: var(--text); margin: 0 0 8px 0; }
+  .pain-card p { font-size: 0.48em !important; margin: 0; text-align: center; }
+
+  /* Solution cards */
+  .solution-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .solution-card {
+    background: rgba(59,130,246,0.05);
+    border: 1px solid rgba(59,130,246,0.15);
+    border-radius: 14px;
+    padding: 22px;
+  }
+
+  .solution-card h4 { font-size: 0.65em; font-weight: 700; color: var(--primary); margin: 0 0 6px 0; }
+  .solution-card p { font-size: 0.48em !important; margin: 0; }
+
+  /* Slide-specific title styling */
+  .slide-subtitle {
+    font-size: 0.7em;
+    color: var(--muted);
+    font-weight: 400;
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+
+  /* Glow effect on title slide */
+  .glow-ring {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    box-shadow: 0 0 40px var(--primary-glow), inset 0 0 40px var(--primary-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 30px auto;
+    font-size: 2.5em;
+  }
+
+  /* Roadmap */
+  .roadmap {
+    display: flex;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .roadmap-item {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+  }
+
+  .roadmap-item::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .roadmap-item:nth-child(1)::before { background: var(--success); }
+  .roadmap-item:nth-child(2)::before { background: var(--primary); }
+  .roadmap-item:nth-child(3)::before { background: var(--warning); }
+
+  .roadmap-item .phase {
+    font-size: 0.42em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .roadmap-item:nth-child(1) .phase { color: var(--success); }
+  .roadmap-item:nth-child(2) .phase { color: var(--primary); }
+  .roadmap-item:nth-child(3) .phase { color: var(--warning); }
+
+  .roadmap-item h4 { font-size: 0.6em; font-weight: 700; color: var(--text); margin: 0 0 8px 0; }
+  .roadmap-item li { font-size: 0.45em !important; margin-bottom: 4px; }
+
+  /* CTA / final slide */
+  .cta-links {
+    display: flex;
+    gap: 20px;
+    margin-top: 30px;
+    justify-content: center;
+  }
+
+  .cta-link {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 32px;
+    text-align: center;
+    text-decoration: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .cta-link:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 20px var(--primary-glow);
+  }
+
+  .cta-link .cta-label {
+    font-size: 0.5em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .cta-link .cta-url {
+    font-size: 0.55em;
+    color: var(--primary);
+    font-weight: 600;
+    display: block;
+  }
+
+  /* Tech stack grid */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .tech-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+  }
+
+  .tech-card h4 {
+    font-size: 0.6em;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+  }
+
+  .tech-card:nth-child(1) h4 { color: #60a5fa; }
+  .tech-card:nth-child(2) h4 { color: #34d399; }
+  .tech-card:nth-child(3) h4 { color: #a78bfa; }
+
+  .tech-card li { font-size: 0.45em !important; margin-bottom: 3px; }
+
+  /* Centered slides */
+  .centered { text-align: center !important; }
+
+  /* Progress bar color */
+  .reveal .progress span { background: var(--primary); }
+
+  /* Slide number */
+  .reveal .slide-number { color: var(--muted); font-family: 'Inter', sans-serif; font-size: 14px; }
+
+  /* Override reveal defaults */
+  .reveal .slides section .fragment.visible { opacity: 1; }
+  .reveal .slides section .fragment { opacity: 0; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============================================================ -->
+<!-- SLIDE 1: TITLE -->
+<!-- ============================================================ -->
+<section class="centered" data-transition="fade">
+  <div class="glow-ring">
+    <span style="font-size:0.6em; font-weight:900;">LW</span>
+  </div>
+  <h1><span class="gradient-text">LLMWatch</span></h1>
+  <h3 style="margin-top: 12px; font-weight: 400; color: var(--muted);">LLMOps SaaS Platform</h3>
+  <p style="font-size: 0.8em; color: var(--text); margin-top: 20px; font-weight: 500; text-align: center;">
+    Route. Orchestrate. Observe.
+  </p>
+  <div style="margin-top: 30px;">
+    <span class="tag tag-blue">Multi-Model Gateway</span>
+    <span class="tag tag-green">AI Agent Orchestration</span>
+    <span class="tag tag-purple">Full Observability</span>
+    <span class="tag tag-orange">API Key Management</span>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 2: THE PROBLEM -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2>The <span class="gradient-text">Problem</span></h2>
+  <p style="font-size: 0.7em; margin-bottom: 8px;">AI teams are deploying LLMs to production — but flying completely blind.</p>
+
+  <div class="pain-grid">
+    <div class="pain-card">
+      <span class="pain-icon">$</span>
+      <h4>No Cost Visibility</h4>
+      <p>"How much did we spend on LLM calls last week?" — No one knows.</p>
+    </div>
+    <div class="pain-card">
+      <span class="pain-icon">?</span>
+      <h4>Agent Black Box</h4>
+      <p>"Why did the agent fail?" — No execution traces, no debugging tools.</p>
+    </div>
+    <div class="pain-card">
+      <span class="pain-icon">!</span>
+      <h4>Fragmented Tools</h4>
+      <p>LangSmith for tracing, Helicone for proxy, Arize for monitoring — 3+ tools, 3+ bills.</p>
+    </div>
+  </div>
+
+  <div class="glass-sm" style="margin-top: 20px; text-align: center;">
+    <span style="font-size: 0.7em; color: var(--warning); font-weight: 700;">73% of AI teams</span>
+    <span style="font-size: 0.6em; color: var(--muted);"> lack production LLM observability</span>
+    <span style="font-size: 0.45em; color: var(--muted); display: block; margin-top: 4px;">— Gartner, 2025</span>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 3: THE SOLUTION -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2>The <span class="gradient-text">Solution</span></h2>
+  <p style="font-size: 0.7em;">One platform that does it all — no more stitching together 4 different tools.</p>
+
+  <div class="solution-grid">
+    <div class="solution-card">
+      <h4>Multi-Model Gateway</h4>
+      <p>Route requests to Gemini, Qwen, or any OpenAI-compatible model through a single unified API. Swap models with zero downtime.</p>
+    </div>
+    <div class="solution-card">
+      <h4>AI Agent Orchestration</h4>
+      <p>Built-in ReAct agents with 4 tools — web search, code execution, DB query, doc analysis. Real-time SSE streaming of every step.</p>
+    </div>
+    <div class="solution-card">
+      <h4>Full Observability</h4>
+      <p>Track cost, latency, error rates, and model performance in real-time. Every LLM call logged to MLFlow for experiment tracking.</p>
+    </div>
+    <div class="solution-card">
+      <h4>Enterprise API Keys</h4>
+      <p>Create, rotate, and revoke API keys. SHA-256 hashed at rest with per-key usage tracking. Same pattern as Stripe &amp; OpenAI.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 4: FEATURES — GATEWAY & ANALYTICS -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2>Features: <span class="gradient-text">Gateway & Analytics</span></h2>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <span class="icon">&#9881;</span>
+      <h4>Multi-Model Routing</h4>
+      <p>Strategy pattern routes to Gemini 3 Flash or self-hosted Qwen. Add new models in minutes — zero downtime swaps.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">&#9733;</span>
+      <h4>Real-Time Dashboard</h4>
+      <p>Live cost tracking, latency percentiles, request volume, error rates, and model breakdown — all updating in real-time.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">&#128065;</span>
+      <h4>Reasoning Mode</h4>
+      <p>Toggle deep thinking to see the LLM's chain-of-thought reasoning alongside responses. Debug prompt quality instantly.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">&#128202;</span>
+      <h4>MLFlow Integration</h4>
+      <p>Every LLM call automatically logged for experiment tracking, model comparison, A/B testing, and metric aggregation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 5: FEATURES — AGENTS & API KEYS -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2>Features: <span class="gradient-text">Agents & API Keys</span></h2>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <span class="icon">&#9889;</span>
+      <h4>ReAct Agent Engine</h4>
+      <p>Autonomous agents with 4 tools: web search, sandboxed code execution, company-scoped DB queries, and document analysis.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">&#128269;</span>
+      <h4>Agent Trace Viewer</h4>
+      <p>Full execution traces in DynamoDB — step timeline, tool usage breakdown, per-step latency, success/failure tracking.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">&#128273;</span>
+      <h4>API Key Management</h4>
+      <p>Create, list, regenerate, and revoke keys. SHA-256 hashed, per-key request counting, last-used timestamps.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">&#128274;</span>
+      <h4>Dual Authentication</h4>
+      <p>Every endpoint accepts JWT (browser) or X-API-Key (programmatic). Fire-and-forget usage tracking per key.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 6: ARCHITECTURE -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2><span class="gradient-text">Architecture</span></h2>
+
+  <div class="arch-diagram">
+    <div class="arch-row">
+      <div class="arch-box highlight">
+        <span class="arch-label">React 19 SPA</span>
+        <span class="arch-sub">TypeScript + Vite 6 + Tailwind v4</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">&#8595; &nbsp; JWT / X-API-Key &nbsp; &#8595;</div>
+
+    <div class="arch-row">
+      <div class="arch-box" style="border-color: rgba(59,130,246,0.3);">
+        <span class="arch-label">Nginx Reverse Proxy</span>
+        <span class="arch-sub">SPA routing + /api/* proxy</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">&#8595;</div>
+
+    <div class="arch-row">
+      <div class="arch-box highlight">
+        <span class="arch-label">FastAPI Server</span>
+        <span class="arch-sub">Python 3.11 + LangChain 0.3 + Pydantic v2</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">&#8595;</div>
+
+    <div class="arch-row">
+      <div class="arch-box">
+        <span class="arch-label">Gemini 3 Flash</span>
+        <span class="arch-sub">Google API</span>
+      </div>
+      <div class="arch-box">
+        <span class="arch-label">Qwen 3.5-35B</span>
+        <span class="arch-sub">vLLM (optional)</span>
+      </div>
+      <div class="arch-box">
+        <span class="arch-label">DynamoDB</span>
+        <span class="arch-sub">4 tables</span>
+      </div>
+      <div class="arch-box">
+        <span class="arch-label">MLFlow</span>
+        <span class="arch-sub">Experiment tracking</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 16px;">
+    <span class="tag tag-blue">Docker Compose</span>
+    <span class="tag tag-green">AWS EC2</span>
+    <span class="tag tag-purple">GitHub Actions CI/CD</span>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 7: COMPETITIVE LANDSCAPE -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2><span class="gradient-text">Competitive</span> Landscape</h2>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Capability</th>
+        <th class="llmwatch">LLMWatch</th>
+        <th>LangSmith</th>
+        <th>Helicone</th>
+        <th>Arize AI</th>
+        <th>W&B</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>LLM Gateway / Routing</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="partial">Proxy</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+      </tr>
+      <tr>
+        <td>AI Agent Orchestration</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+      </tr>
+      <tr>
+        <td>Agent Execution Tracing</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+      </tr>
+      <tr>
+        <td>Observability Dashboard</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+      </tr>
+      <tr>
+        <td>Cost & Latency Tracking</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="partial">~</td>
+      </tr>
+      <tr>
+        <td>API Key Management</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+      </tr>
+      <tr>
+        <td>Self-Hostable</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+      </tr>
+      <tr>
+        <td>MLFlow Integration</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+      </tr>
+      <tr>
+        <td>Real-Time SSE Streaming</td>
+        <td class="llmwatch yes">&#10003;</td>
+        <td class="yes">&#10003;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+        <td class="no">&#10005;</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="glass-sm" style="margin-top: 16px; text-align: center;">
+    <span style="font-size: 0.6em; color: var(--text); font-weight: 600;">LLMWatch is the <em>only</em> platform combining routing + agents + observability + API management</span>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 8: PROGRAMMATIC ACCESS -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2><span class="gradient-text">Programmatic</span> Access</h2>
+  <p style="font-size: 0.65em;">One API key. Every feature. Same pattern as Stripe &amp; OpenAI.</p>
+
+  <div class="code-block">
+    <span class="comment"># Chat Completion</span><br>
+    <span class="keyword">curl</span> <span class="url">http://your-host:3000/api/chat/completions</span> \<br>
+    &nbsp;&nbsp;-H <span class="header">"X-API-Key: lw_your_key_here"</span> \<br>
+    &nbsp;&nbsp;-H <span class="string">"Content-Type: application/json"</span> \<br>
+    &nbsp;&nbsp;-d <span class="string">'{"prompt":"Explain AI","model":"gemini","thinking_mode":false}'</span><br><br>
+    <span class="comment"># Run an Agent</span><br>
+    <span class="keyword">curl</span> <span class="url">http://your-host:3000/api/agent/run</span> \<br>
+    &nbsp;&nbsp;-H <span class="header">"X-API-Key: lw_your_key_here"</span> \<br>
+    &nbsp;&nbsp;-d <span class="string">'{"prompt":"Search for AI news","model":"gemini","tools":["web_search"]}'</span><br><br>
+    <span class="comment"># Get Analytics</span><br>
+    <span class="keyword">curl</span> <span class="url">http://your-host:3000/api/analytics/summary</span> \<br>
+    &nbsp;&nbsp;-H <span class="header">"X-API-Key: lw_your_key_here"</span>
+  </div>
+
+  <div style="margin-top: 16px; display: flex; gap: 16px;">
+    <div class="glass-sm" style="flex: 1; text-align: center;">
+      <span style="font-size: 0.55em; color: var(--success); font-weight: 700;">SHA-256 Hashed</span><br>
+      <span style="font-size: 0.42em; color: var(--muted);">Keys never stored in plaintext</span>
+    </div>
+    <div class="glass-sm" style="flex: 1; text-align: center;">
+      <span style="font-size: 0.55em; color: var(--primary); font-weight: 700;">Per-Key Tracking</span><br>
+      <span style="font-size: 0.42em; color: var(--muted);">Request count + last used</span>
+    </div>
+    <div class="glass-sm" style="flex: 1; text-align: center;">
+      <span style="font-size: 0.55em; color: var(--warning); font-weight: 700;">Instant Rotation</span><br>
+      <span style="font-size: 0.42em; color: var(--muted);">Regenerate or revoke in 1 click</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 9: TECH STACK & NUMBERS -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2><span class="gradient-text">Tech Stack</span> & Numbers</h2>
+
+  <div class="tech-grid">
+    <div class="tech-card">
+      <h4>Backend</h4>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li>Python 3.11 + FastAPI</li>
+        <li>LangChain 0.3 (ReAct)</li>
+        <li>Pydantic v2</li>
+        <li>boto3 (DynamoDB)</li>
+        <li>MLFlow 3.x</li>
+        <li>JWT + API Key auth</li>
+        <li>slowapi (rate limiting)</li>
+      </ul>
+    </div>
+    <div class="tech-card">
+      <h4>Frontend</h4>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li>React 19 + TypeScript 5</li>
+        <li>Vite 6</li>
+        <li>Tailwind CSS v4</li>
+        <li>React Router v7</li>
+        <li>Zustand</li>
+        <li>Framer Motion</li>
+        <li>Recharts</li>
+      </ul>
+    </div>
+    <div class="tech-card">
+      <h4>Infrastructure</h4>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li>AWS EC2</li>
+        <li>AWS DynamoDB</li>
+        <li>Docker Compose</li>
+        <li>Nginx reverse proxy</li>
+        <li>GitHub Actions CI/CD</li>
+        <li>MLFlow (Docker)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <span class="number">144+</span>
+      <span class="label">Tests Passing</span>
+    </div>
+    <div class="stat-card">
+      <span class="number">4</span>
+      <span class="label">DynamoDB Tables</span>
+    </div>
+    <div class="stat-card">
+      <span class="number">3</span>
+      <span class="label">Docker Services</span>
+    </div>
+    <div class="stat-card">
+      <span class="number">&lt;600ms</span>
+      <span class="label">Gemini Latency</span>
+    </div>
+    <div class="stat-card">
+      <span class="number">24h</span>
+      <span class="label">Built Solo</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 10: WHAT'S NEXT -->
+<!-- ============================================================ -->
+<section data-transition="slide">
+  <h2><span class="gradient-text">What's Next</span></h2>
+  <p style="font-size: 0.65em;">From hackathon project to production SaaS — the roadmap.</p>
+
+  <div class="roadmap">
+    <div class="roadmap-item">
+      <span class="phase">Done</span>
+      <h4>Core Platform</h4>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li>&#10003; Multi-model gateway</li>
+        <li>&#10003; ReAct agent + 4 tools</li>
+        <li>&#10003; Real-time analytics</li>
+        <li>&#10003; Agent trace viewer</li>
+        <li>&#10003; API key management</li>
+        <li>&#10003; Dual auth (JWT + API Key)</li>
+        <li>&#10003; MLFlow integration</li>
+        <li>&#10003; CI/CD pipeline</li>
+      </ul>
+    </div>
+    <div class="roadmap-item">
+      <span class="phase">Q2 2026</span>
+      <h4>Scale & Extend</h4>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li>&#9651; Multi-provider (Claude, GPT, Llama)</li>
+        <li>&#9651; Prompt versioning & A/B testing</li>
+        <li>&#9651; Alerting & anomaly detection</li>
+        <li>&#9651; Team management & RBAC</li>
+        <li>&#9651; Webhook integrations</li>
+        <li>&#9651; SDK (Python, TypeScript)</li>
+      </ul>
+    </div>
+    <div class="roadmap-item">
+      <span class="phase">Q3 2026</span>
+      <h4>Enterprise</h4>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li>&#9651; SSO / SAML authentication</li>
+        <li>&#9651; Custom model fine-tuning</li>
+        <li>&#9651; Compliance & audit logs</li>
+        <li>&#9651; On-premise deployment</li>
+        <li>&#9651; SLA & dedicated support</li>
+        <li>&#9651; Managed cloud offering</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 11: THANK YOU -->
+<!-- ============================================================ -->
+<section class="centered" data-transition="fade">
+  <div class="glow-ring" style="width: 100px; height: 100px; margin-bottom: 24px;">
+    <span style="font-size:0.5em; font-weight:900;">LW</span>
+  </div>
+  <h1 style="font-size: 2.4em;"><span class="gradient-text">Thank You</span></h1>
+  <p style="font-size: 0.8em; color: var(--text); text-align: center; margin-top: 12px;">
+    The LLMOps platform engineering teams actually need.
+  </p>
+
+  <div class="cta-links">
+    <div class="cta-link">
+      <span class="cta-label">Live Demo</span>
+      <span class="cta-url">http://3.236.50.182:3000</span>
+    </div>
+    <div class="cta-link">
+      <span class="cta-label">GitHub</span>
+      <span class="cta-url">github.com/omer-ulucan/llmwatch</span>
+    </div>
+    <div class="cta-link">
+      <span class="cta-label">API Docs</span>
+      <span class="cta-url">http://3.236.50.182:8000/docs</span>
+    </div>
+  </div>
+
+  <p style="font-size: 0.55em; text-align: center; margin-top: 30px; color: var(--muted);">
+    Built solo in 24 hours &nbsp;|&nbsp; 144+ tests &nbsp;|&nbsp; Fully deployed on AWS
+  </p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.min.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    transition: 'slide',
+    transitionSpeed: 'default',
+    backgroundTransition: 'fade',
+    center: false,
+    width: 1280,
+    height: 720,
+    margin: 0.04,
+    progress: true,
+    controls: true,
+    controlsTutorial: false,
+    history: true,
+  });
+</script>
+</body>
+</html>
