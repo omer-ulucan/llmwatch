@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from models.schemas import RegisterRequest, LoginRequest, TokenResponse
 from auth.jwt_handler import get_password_hash, verify_password, create_access_token
 from services.dynamo_service import get_dynamo_service
-from exceptions import ValidationException
+from exceptions import AuthenticationException, ValidationException
 from config import settings
 import uuid
 from datetime import datetime, timezone
@@ -80,15 +80,15 @@ async def login(request: Request, data: LoginRequest):
                 "token_type": "bearer",
                 "expires_in": 3600 * 24,
             }
-        raise ValidationException("Invalid credentials")
+        raise AuthenticationException("Invalid credentials")
 
     # ── Normal flow: look up user in DynamoDB ──────────────
     user = get_dynamo_service().get_user_by_email(data.email)
     if not user or not verify_password(data.password, user.get("hashed_password", "")):
-        raise ValidationException("Invalid credentials")
+        raise AuthenticationException("Invalid credentials")
 
     if not user.get("is_active", True):
-        raise ValidationException("Account disabled")
+        raise AuthenticationException("Account disabled")
 
     # WHY: Including company_id in the token prevents us from needing to hit the DB
     # on every subsequent request to figure out which tenant they belong to.
