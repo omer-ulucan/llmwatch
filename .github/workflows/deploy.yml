@@ -15,8 +15,54 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             cd ~/llmwatch
-            git pull origin main
+
+            echo "=== Git state before reset ==="
+            git status --short
+            git log --oneline -1
+
+            echo "=== Force-resetting to origin/main ==="
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "=== Git state after reset ==="
+            git log --oneline -3
+
+            echo "=== Verifying nginx.conf has /api proxy block ==="
+            grep "proxy_pass" frontend/nginx.conf
+
+            echo "=== Verifying client.ts has /api baseURL ==="
+            grep "baseURL" frontend/src/api/client.ts
+
+            echo "=== Stopping containers ==="
             docker-compose down
+
+            echo "=== Building images (no cache) ==="
             docker-compose build --no-cache
+
+            echo "=== Starting containers ==="
             docker-compose up -d
+
+            echo "=== Container status ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            echo "=== Waiting for backend startup ==="
+            sleep 8
+
+            echo "=== Testing nginx /api proxy ==="
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health)
+            echo "Proxy health check status: $STATUS"
+            if [ "$STATUS" != "200" ]; then
+              echo "ERROR: /api proxy returned $STATUS, expected 200"
+              echo "=== Frontend container logs ==="
+              docker-compose logs --tail=30 frontend
+              echo "=== Backend container logs ==="
+              docker-compose logs --tail=30 backend
+              exit 1
+            fi
+
+            BODY=$(curl -s http://localhost:3000/api/health)
+            echo "Proxy health check body: $BODY"
+
+            echo "=== Deploy complete ==="
