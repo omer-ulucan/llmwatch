@@ -4,28 +4,35 @@ Purpose: Handles all interactions with AWS DynamoDB.
 WHY: Encapsulating database logic isolates the AWS SDK (boto3) from the rest of the app,
 making it easier to test, secure, and change underlying DB models in the future.
 """
+
 import boto3
 from botocore.exceptions import ClientError
 from typing import Dict, Any, List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from config import settings, logger
 from exceptions import DatabaseException, ResourceNotFoundException
 
+
 class DynamoDBService:
     """Service to interact with DynamoDB securely."""
-    
+
     def __init__(self):
         # WHY: We instantiate the resource once per service lifecycle to reuse HTTP connections.
         try:
-            self.dynamodb = boto3.resource(
-                'dynamodb',
-                region_name=settings.aws_region,
-                aws_access_key_id=settings.aws_access_key_id,
-                aws_secret_access_key=settings.aws_secret_access_key
-            )
+            # WHY: Only pass explicit credentials when configured.
+            # On EC2 with an IAM role, boto3 automatically uses instance metadata.
+            resource_kwargs: Dict[str, str] = {"region_name": settings.aws_region}
+            if settings.aws_access_key_id:
+                resource_kwargs["aws_access_key_id"] = settings.aws_access_key_id
+            if settings.aws_secret_access_key:
+                resource_kwargs["aws_secret_access_key"] = (
+                    settings.aws_secret_access_key
+                )
+            self.dynamodb = boto3.resource("dynamodb", **resource_kwargs)
             self.logs_table = self.dynamodb.Table(settings.dynamodb_table_logs)
             self.users_table = self.dynamodb.Table(settings.dynamodb_table_users)
+            self.traces_table = self.dynamodb.Table(settings.dynamodb_table_traces)
         except Exception as e:
             logger.error(f"Failed to initialize DynamoDB client: {str(e)}")
             raise DatabaseException("Failed to establish database connection.")
@@ -33,30 +40,30 @@ class DynamoDBService:
     def save_log(self, company_id: str, log_data: Dict[str, Any]) -> str:
         """
         Saves an LLM interaction log to DynamoDB.
-        
+
         Args:
             company_id (str): The PK of the logs table.
             log_data (Dict[str, Any]): The metric content to be saved.
-            
+
         Returns:
             str: The generated log_id.
-            
+
         Raises:
             DatabaseException: When the underlying PutItem request fails.
         """
         # WHY: Ensuring SK uniqueness using a composite format
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         log_id = str(uuid.uuid4())
         sk = f"{timestamp}#{log_id}"
-        
+
         item = {
-            'company_id': company_id,
-            'timestamp#log_id': sk,
-            'log_id': log_id,
-            'timestamp': timestamp,
-            **log_data
+            "company_id": company_id,
+            "timestamp#log_id": sk,
+            "log_id": log_id,
+            "timestamp": timestamp,
+            **log_data,
         }
-        
+
         try:
             self.logs_table.put_item(Item=item)
             return log_id
@@ -68,57 +75,163 @@ class DynamoDBService:
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """
         Fetches a user record using the Global Secondary Index on email.
-        
+
         Args:
             email (str): The user's email address.
-            
+
         Returns:
             Optional[Dict[str, Any]]: User object if found, None otherwise.
-            
+
         Raises:
             DatabaseException: If query operation fails.
         """
         try:
             # WHY: Parameterized Query avoids injection attacks. No string concatenation used.
             response = self.users_table.query(
-                IndexName='email-index',
-                KeyConditionExpression='email = :email_val',
-                ExpressionAttributeValues={
-                    ':email_val': email
-                }
+                IndexName="email-index",
+                KeyConditionExpression="email = :email_val",
+                ExpressionAttributeValues={":email_val": email},
             )
-            items = response.get('Items', [])
+            items = response.get("Items", [])
             return items[0] if items else None
         except ClientError as e:
-            logger.error(f"DynamoDB Query error for email lookup: {e.response['Error']['Message']}")
+            logger.error(
+                f"DynamoDB Query error for email lookup: {e.response['Error']['Message']}"
+            )
             raise DatabaseException("Failed to query user by email.")
-            
+
     def get_logs(self, company_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         """
         Fetches the most recent logs for a company.
-        
+
         Args:
             company_id (str): The associated company.
             limit (int): Max items to return.
-            
+
         Returns:
             List[Dict[str, Any]]: List of log entries.
-            
+
         Raises:
             DatabaseException: If the query fails.
         """
         try:
             response = self.logs_table.query(
-                KeyConditionExpression='company_id = :comp_id',
-                ExpressionAttributeValues={
-                    ':comp_id': company_id
-                },
-                ScanIndexForward=False, # Descending sort (newest first)
-                Limit=limit
+                KeyConditionExpression="company_id = :comp_id",
+                ExpressionAttributeValues={":comp_id": company_id},
+                ScanIndexForward=False,  # Descending sort (newest first)
+                Limit=limit,
             )
-            return response.get('Items', [])
+            return response.get("Items", [])
         except ClientError as e:
             logger.error(f"DynamoDB get_logs error: {e.response['Error']['Message']}")
             raise DatabaseException("Failed to retrieve logs.")
 
+    # ── Agent Trace Methods ────────────────────────────────
+
+    def save_trace(self, company_id: str, trace_data: Dict[str, Any]) -> str:
+        """
+        Saves a complete agent execution trace to DynamoDB.
+        WHY: One item per run (not per step) keeps reads fast and cheap. Agent traces
+        with 20 steps are ~50KB max, well within DynamoDB's 400KB item limit.
+
+        Args:
+            company_id (str): The company that owns this trace.
+            trace_data (Dict[str, Any]): Full trace including steps list.
+
+        Returns:
+            str: The run_id of the saved trace.
+
+        Raises:
+            DatabaseException: When PutItem fails.
+        """
+        run_id = trace_data.get("run_id", str(uuid.uuid4()))
+        timestamp = trace_data.get("timestamp", datetime.now(timezone.utc).isoformat())
+        sk = f"{timestamp}#{run_id}"
+
+        item = {
+            "company_id": company_id,
+            "run_ts#run_id": sk,
+            "run_id": run_id,
+            **trace_data,
+        }
+
+        # WHY: Convert any float/int values that DynamoDB can't handle (e.g., Decimal issues)
+        # boto3 handles Python floats via TypeSerializer, but we ensure booleans are clean.
+        try:
+            self.traces_table.put_item(Item=item)
+            return run_id
+        except ClientError as e:
+            logger.error(f"DynamoDB save_trace error: {e.response['Error']['Message']}")
+            raise DatabaseException("Failed to save agent trace.")
+
+    def get_traces(self, company_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetches recent agent traces for a company (for the trace list view).
+        WHY: ScanIndexForward=False gives us newest-first ordering since the SK
+        is a composite of timestamp#run_id.
+
+        Args:
+            company_id (str): The company to fetch traces for.
+            limit (int): Maximum number of traces to return.
+
+        Returns:
+            List[Dict[str, Any]]: List of trace items, newest first.
+
+        Raises:
+            DatabaseException: If the query fails.
+        """
+        try:
+            response = self.traces_table.query(
+                KeyConditionExpression="company_id = :comp_id",
+                ExpressionAttributeValues={":comp_id": company_id},
+                ScanIndexForward=False,
+                Limit=limit,
+            )
+            return response.get("Items", [])
+        except ClientError as e:
+            logger.error(f"DynamoDB get_traces error: {e.response['Error']['Message']}")
+            raise DatabaseException("Failed to retrieve agent traces.")
+
+    def get_trace_by_id(self, company_id: str, run_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetches a single trace by run_id using the GSI.
+        WHY: The run_id-index GSI lets us look up a specific trace without knowing
+        its exact timestamp (which is required for the primary key).
+
+        Args:
+            company_id (str): The company that owns this trace.
+            run_id (str): The UUID of the agent run.
+
+        Returns:
+            Optional[Dict[str, Any]]: The full trace if found, None otherwise.
+
+        Raises:
+            DatabaseException: If the query fails.
+        """
+        try:
+            response = self.traces_table.query(
+                IndexName="run_id-index",
+                KeyConditionExpression="run_id = :rid",
+                ExpressionAttributeValues={":rid": run_id},
+            )
+            items = response.get("Items", [])
+            if not items:
+                return None
+            # WHY: Verify company ownership to prevent cross-tenant data access
+            trace = items[0]
+            if trace.get("company_id") != company_id:
+                return None
+            return trace
+        except ClientError as e:
+            logger.error(
+                f"DynamoDB get_trace_by_id error: {e.response['Error']['Message']}"
+            )
+            raise DatabaseException("Failed to retrieve agent trace.")
+
+
 dynamo_service = DynamoDBService()
+
+
+def get_dynamo_service() -> DynamoDBService:
+    """Lazy factory for DynamoDBService. Enables easy mocking in tests."""
+    return dynamo_service

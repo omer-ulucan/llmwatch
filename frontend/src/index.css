@@ -5,7 +5,6 @@
  * We inject custom colors and Framer Motion hooks directly here to build an Awwwards-level design system.
  */
 @import "tailwindcss";
-@import "tailwindcss-animate";
 
 /* Custom Theme Variables (Awwwards-level premium dark mode) */
 @theme {

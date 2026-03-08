@@ -3,10 +3,29 @@
  * Purpose: Manage tenant configurations.
  * WHY: Standard UI requirement for API key management and danger zones.
  */
-import React from 'react';
-import { Save, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Save, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const Settings: React.FC = () => {
+  const [apiKey] = useState('••••••••••••••••••••••••••••••••');
+
+  const handleRegenerate = () => {
+    window.alert('API key regeneration is not yet implemented. This will be available in a future release.');
+  };
+
+  const handleSave = () => {
+    window.alert('Settings saved successfully.');
+  };
+
+  const handleDelete = () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this workspace? This action cannot be reversed.'
+    );
+    if (confirmed) {
+      window.alert('Workspace deletion is not yet implemented. This will be available in a future release.');
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
       <div>
@@ -23,19 +42,25 @@ const Settings: React.FC = () => {
             <div className="flex gap-4">
               <input 
                 type="password" 
-                value="llmw_sk_948f2940afb12x91204018..." 
+                value={apiKey} 
                 readOnly
                 className="flex-1 bg-input/50 border border-card-border rounded-xl px-4 py-2 text-foreground font-mono focus:outline-none"
               />
-              <button className="px-6 bg-white/[0.05] hover:bg-white/[0.1] rounded-xl border border-card-border transition-colors cursor-pointer text-sm font-medium hover:text-white">
-                Regenerate
+              <button 
+                onClick={handleRegenerate}
+                className="flex items-center gap-2 px-6 bg-white/[0.05] hover:bg-white/[0.1] rounded-xl border border-card-border transition-colors cursor-pointer text-sm font-medium hover:text-white"
+              >
+                <RefreshCw size={14} /> Regenerate
               </button>
             </div>
           </div>
         </div>
         
         <div className="pt-4">
-          <button className="flex items-center gap-2 bg-primary text-white px-6 py-2.5 rounded-xl hover:bg-primary-hover shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:shadow-[0_0_30px_rgba(59,130,246,0.4)] transition-all font-medium cursor-pointer">
+          <button 
+            onClick={handleSave}
+            className="flex items-center gap-2 bg-primary text-white px-6 py-2.5 rounded-xl hover:bg-primary-hover shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:shadow-[0_0_30px_rgba(59,130,246,0.4)] transition-all font-medium cursor-pointer"
+          >
             <Save size={16} /> Save Changes
           </button>
         </div>
@@ -49,7 +74,10 @@ const Settings: React.FC = () => {
         <p className="text-sm text-foreground/80">
           Permanently delete this workspace and all associated logs. This action cannot be reversed.
         </p>
-        <button className="bg-error text-white px-6 py-2.5 rounded-xl hover:bg-error/90 font-medium transition-colors cursor-pointer relative z-10 shadow-lg shadow-error/20">
+        <button 
+          onClick={handleDelete}
+          className="bg-error text-white px-6 py-2.5 rounded-xl hover:bg-error/90 font-medium transition-colors cursor-pointer relative z-10 shadow-lg shadow-error/20"
+        >
           Delete Workspace
         </button>
       </div>

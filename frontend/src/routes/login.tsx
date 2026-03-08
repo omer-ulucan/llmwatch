@@ -4,9 +4,9 @@
  * WHY: High visual impact first impression with animated mesh. Uses Zustand to securely store JWT.
  */
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
-import { LogIn, Loader2, AlertCircle } from 'lucide-react';
+import { LogIn, Loader2, AlertCircle, Info, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { useStore } from '@/store/useStore';
 
@@ -106,7 +106,28 @@ const Login: React.FC = () => {
           >
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : "Sign In"}
           </button>
+
+          {/* Demo credentials hint */}
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/[0.06] border border-primary/10 text-xs text-muted-foreground mt-1">
+            <Info size={14} className="text-primary shrink-0 mt-0.5" />
+            <span>
+              Demo credentials: <code className="text-foreground font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">admin@company.com</code> / <code className="text-foreground font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">admin123</code>
+            </span>
+          </div>
         </form>
+
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            Don&apos;t have an account?{' '}
+            <Link to="/signup" className="text-primary hover:text-primary-hover transition-colors font-medium">
+              Sign up
+            </Link>
+          </p>
+          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={14} />
+            Back to home
+          </Link>
+        </div>
       </motion.div>
     </div>
   );

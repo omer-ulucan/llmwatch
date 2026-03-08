@@ -3,7 +3,7 @@
  * Purpose: Advanced metric visualization.
  * WHY: Needs a sortable table for raw logs allowing engineers to find specific edge cases.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Download, Search } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { LogEntry } from '@/types';
@@ -22,6 +22,32 @@ const Analytics: React.FC = () => {
     log.error_type?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleExportCSV = useCallback(() => {
+    if (filteredLogs.length === 0) {
+      window.alert('No data to export.');
+      return;
+    }
+
+    const headers = ['Timestamp', 'Model', 'Prompt Preview', 'Latency (ms)', 'Cost (USD)', 'Status'];
+    const rows = filteredLogs.map(log => [
+      log.timestamp,
+      log.model_name,
+      `"${(log.prompt_preview || '').replace(/"/g, '""')}"`,
+      Math.round(log.latency_ms).toString(),
+      log.cost_usd.toFixed(5),
+      log.success ? 'Success' : 'Error',
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `llmwatch-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [filteredLogs]);
+
   return (
     <div className="max-w-7xl mx-auto pb-12">
       <div className="flex justify-between items-center mb-8">
@@ -29,7 +55,10 @@ const Analytics: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight mb-1">Analytics Explorer</h1>
           <p className="text-muted-foreground">Inspect raw invocation traces across all deployed models.</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 glass-card rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer text-sm font-medium hover:text-white">
+        <button 
+          onClick={handleExportCSV}
+          className="flex items-center gap-2 px-4 py-2 glass-card rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer text-sm font-medium hover:text-white"
+        >
           <Download size={16} /> Export CSV
         </button>
       </div>

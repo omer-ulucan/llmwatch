@@ -3,56 +3,96 @@ Module: auth.py
 Purpose: Exposes authentication API routes.
 WHY: Encapsulating login/registration endpoints isolates public-facing handlers from protected routes.
 """
+
 from fastapi import APIRouter, HTTPException, Depends, Request
 from models.schemas import RegisterRequest, LoginRequest, TokenResponse
 from auth.jwt_handler import get_password_hash, verify_password, create_access_token
-from services.dynamo_service import dynamo_service
+from services.dynamo_service import get_dynamo_service
 from exceptions import ValidationException
+from config import settings
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# WHY: Hardcoded demo user lets the app run without DynamoDB for local dev and demos.
+# Set DEMO_MODE=false in production to disable.
+_DEMO_USER = {
+    "email": "admin@company.com",
+    "password": "admin123",
+    "user_id": "demo-user-001",
+    "company_id": "demo-company-001",
+}
+
 
 @router.post("/register")
 async def register(request: Request, data: RegisterRequest):
     """
     Registers a new company and admin user.
     """
-    existing_user = dynamo_service.get_user_by_email(data.email)
+    # ── Demo mode: accept any registration without DynamoDB ──
+    if settings.demo_mode:
+        return {
+            "message": "User registered successfully",
+            "company_id": f"demo-{uuid.uuid4().hex[:8]}",
+        }
+
+    existing_user = get_dynamo_service().get_user_by_email(data.email)
     if existing_user:
         # WHY: Generic validation exception, keeping status format standardized by top-level handler
         raise ValidationException("Email already registered")
-        
+
     company_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
     hashed_pwd = get_password_hash(data.password)
-    
+
     item = {
         "company_id": company_id,
         "email": data.email,
         "company_name": data.company_name,
         "user_id": user_id,
         "hashed_password": hashed_pwd,
-        "created_at": datetime.utcnow().isoformat(),
-        "is_active": True
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "is_active": True,
     }
-    
+
     # Normally we'd insert this record in DynamoDB users_table
-    # Since DynamoDBService in our boilerplate didn't explicitly implement put_user, 
+    # Since DynamoDBService in our boilerplate didn't explicitly implement put_user,
     # we manually call put_item on users_table for completion.
-    dynamo_service.users_table.put_item(Item=item)
-    
+    get_dynamo_service().users_table.put_item(Item=item)
+
     return {"message": "User registered successfully", "company_id": company_id}
+
 
 @router.post("/login", response_model=TokenResponse)
 async def login(request: Request, data: LoginRequest):
     """
     Authenticates a user and issues a JWT if successful.
     """
-    user = dynamo_service.get_user_by_email(data.email)
-    if not user or not verify_password(data.password, user.get("hashed_password")):
+    # ── Demo mode: bypass DynamoDB entirely ────────────────
+    if settings.demo_mode:
+        if (
+            data.email == _DEMO_USER["email"]
+            and data.password == _DEMO_USER["password"]
+        ):
+            access_token = create_access_token(
+                data={
+                    "sub": _DEMO_USER["user_id"],
+                    "company_id": _DEMO_USER["company_id"],
+                }
+            )
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": 3600 * 24,
+            }
         raise ValidationException("Invalid credentials")
-        
+
+    # ── Normal flow: look up user in DynamoDB ──────────────
+    user = get_dynamo_service().get_user_by_email(data.email)
+    if not user or not verify_password(data.password, user.get("hashed_password", "")):
+        raise ValidationException("Invalid credentials")
+
     if not user.get("is_active", True):
         raise ValidationException("Account disabled")
 
@@ -61,9 +101,9 @@ async def login(request: Request, data: LoginRequest):
     access_token = create_access_token(
         data={"sub": user["user_id"], "company_id": user["company_id"]}
     )
-    
+
     return {
-        "access_token": access_token, 
+        "access_token": access_token,
         "token_type": "bearer",
-        "expires_in": 3600 * 24 # 24h
+        "expires_in": 3600 * 24,  # 24h
     }

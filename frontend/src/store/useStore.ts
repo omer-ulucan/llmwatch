@@ -1,7 +1,7 @@
 /**
  * Module: useStore.ts
  * Purpose: Global state management using Zustand.
- * WHY: Avoids prop drilling and React Context re-render hell. Stores JWT securely in memory.
+ * WHY: Avoids prop drilling and React Context re-render hell. Persists JWT to localStorage via persist middleware.
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';

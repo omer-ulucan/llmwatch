@@ -6,7 +6,7 @@
 import React from 'react';
 import { NavLink } from 'react-router';
 import { motion } from 'framer-motion';
-import { Activity, MessageSquare, PieChart, Settings, Menu, Zap } from 'lucide-react';
+import { Activity, MessageSquare, PieChart, Settings, Menu, Zap, Bot, ListTree } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 
 const Sidebar: React.FC = () => {
@@ -15,6 +15,8 @@ const Sidebar: React.FC = () => {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: <Activity size={20} /> },
     { name: 'Chat', path: '/chat', icon: <MessageSquare size={20} /> },
+    { name: 'Agent', path: '/agent', icon: <Bot size={20} /> },
+    { name: 'Traces', path: '/traces', icon: <ListTree size={20} /> },
     { name: 'Analytics', path: '/analytics', icon: <PieChart size={20} /> },
     { name: 'Settings', path: '/settings', icon: <Settings size={20} /> },
   ];
