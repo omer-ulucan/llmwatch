@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
-import { LogIn, Loader2, AlertCircle, Info, ArrowLeft } from 'lucide-react';
+import { LogIn, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { useStore } from '@/store/useStore';
 
@@ -83,7 +83,7 @@ const Login: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-input/50 border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
-              placeholder="admin@company.com"
+              placeholder="you@company.com"
             />
           </div>
           
@@ -107,13 +107,6 @@ const Login: React.FC = () => {
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : "Sign In"}
           </button>
 
-          {/* Demo credentials hint */}
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/[0.06] border border-primary/10 text-xs text-muted-foreground mt-1">
-            <Info size={14} className="text-primary shrink-0 mt-0.5" />
-            <span>
-              Demo credentials: <code className="text-foreground font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">admin@company.com</code> / <code className="text-foreground font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">admin123</code>
-            </span>
-          </div>
         </form>
 
         <div className="mt-6 flex flex-col items-center gap-3">

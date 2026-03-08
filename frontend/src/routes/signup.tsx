@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
-import { UserPlus, Loader2, AlertCircle, CheckCircle, ArrowLeft, Info } from 'lucide-react';
+import { UserPlus, Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/api/client';
 
 const Signup: React.FC = () => {
@@ -184,16 +184,6 @@ const Signup: React.FC = () => {
                 'Create Account'
               )}
             </button>
-
-            {/* Demo hint */}
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/[0.06] border border-primary/10 text-xs text-muted-foreground mt-1">
-              <Info size={14} className="text-primary shrink-0 mt-0.5" />
-              <span>
-                In demo mode, you can skip registration and sign in directly
-                with <code className="text-foreground font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">admin@company.com</code>{' '}
-                / <code className="text-foreground font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">admin123</code>
-              </span>
-            </div>
           </form>
         )}
 
