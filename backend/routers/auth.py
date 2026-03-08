@@ -10,6 +10,7 @@ from auth.jwt_handler import get_password_hash, verify_password, create_access_t
 from services.dynamo_service import get_dynamo_service
 from exceptions import AuthenticationException, ValidationException
 from config import settings
+from rate_limit import limiter
 import uuid
 from datetime import datetime, timezone
 
@@ -26,6 +27,7 @@ _DEMO_USER = {
 
 
 @router.post("/register")
+@limiter.limit("5/minute")
 async def register(request: Request, data: RegisterRequest):
     """
     Registers a new company and admin user.
@@ -59,6 +61,7 @@ async def register(request: Request, data: RegisterRequest):
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def login(request: Request, data: LoginRequest):
     """
     Authenticates a user and issues a JWT if successful.

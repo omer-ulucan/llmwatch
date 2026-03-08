@@ -7,19 +7,18 @@ WHY: Serving as the orchestrator, it centralizes app configuration to ensure con
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import time
 
 from config import settings, logger
 from exceptions import LLMWatchException
 from middleware.security import setup_security_middleware
+from rate_limit import limiter
 from routers import auth, chat, analytics, agent
 
 
-# WHY: We implement slowapi rate limiters at the application layer to block abuse
-limiter = Limiter(key_func=get_remote_address)
+# WHY: We apply slowapi rate limiters at the application layer to block abuse
 
 
 @asynccontextmanager
