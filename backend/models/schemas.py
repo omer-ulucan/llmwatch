@@ -27,6 +27,11 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
+class RegisterResponse(BaseModel):
+    message: str
+    company_id: str
+
+
 class ChatCompletionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prompt: str = Field(..., max_length=10000)

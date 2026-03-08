@@ -5,7 +5,12 @@ WHY: Encapsulating login/registration endpoints isolates public-facing handlers 
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request
-from models.schemas import RegisterRequest, LoginRequest, TokenResponse
+from models.schemas import (
+    RegisterRequest,
+    LoginRequest,
+    TokenResponse,
+    RegisterResponse,
+)
 from auth.jwt_handler import get_password_hash, verify_password, create_access_token
 from services.dynamo_service import get_dynamo_service
 from exceptions import AuthenticationException, ValidationException
@@ -26,7 +31,7 @@ _DEMO_USER = {
 }
 
 
-@router.post("/register")
+@router.post("/register", response_model=RegisterResponse)
 @limiter.limit("5/minute")
 async def register(request: Request, data: RegisterRequest):
     """
