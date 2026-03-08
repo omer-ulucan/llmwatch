@@ -16,8 +16,16 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Compare plain password with its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Compare plain password with its hash.
+
+    WHY: passlib raises ValueError when the hash is empty, malformed, or uses an
+    unknown scheme.  Catching it here prevents a 500 from leaking through to the
+    caller and treats a corrupt hash the same as a wrong password.
+    """
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except (ValueError, TypeError):
+        return False
 
 
 def get_password_hash(password: str) -> str:
