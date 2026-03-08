@@ -47,8 +47,12 @@ jobs:
             echo "=== Stopping containers ==="
             docker-compose down || true
 
-            echo "=== Building images (no cache) ==="
-            docker-compose build --no-cache
+            echo "=== Freeing disk space ==="
+            docker system prune -af --volumes
+            df -h / | tail -1
+
+            echo "=== Building images ==="
+            docker-compose build
 
             echo "=== Starting containers ==="
             docker-compose up -d
