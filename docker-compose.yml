@@ -6,12 +6,10 @@ services:
       - "8000:8000"
     depends_on:
       - mlflow
-    env_file: .env
+    env_file: ./backend/.env
   frontend:
     build:
       context: ./frontend
-      args:
-        VITE_API_URL: http://3.236.50.182:8000
     ports:
       - "3000:80"
     depends_on:

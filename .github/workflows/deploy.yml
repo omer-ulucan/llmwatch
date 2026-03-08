@@ -19,5 +19,3 @@ jobs:
             git pull origin main
             docker-compose down
             docker-compose up -d --build
-            docker exec llmwatch_backend_1 pip install bcrypt==4.0.1
-            docker-compose restart backend
