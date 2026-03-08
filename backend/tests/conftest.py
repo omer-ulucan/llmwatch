@@ -31,6 +31,7 @@ _TEST_ENV = {
     "DYNAMODB_TABLE_LOGS": "test-logs",
     "DYNAMODB_TABLE_USERS": "test-users",
     "DYNAMODB_TABLE_TRACES": "test-traces",
+    "DYNAMODB_TABLE_API_KEYS": "test-api-keys",
     "JWT_SECRET_KEY": "test-secret-key-for-jwt-do-not-use-in-prod",
     "JWT_ALGORITHM": "HS256",
     "JWT_EXPIRE_HOURS": "24",
