@@ -60,12 +60,14 @@ jobs:
             echo "=== Container status ==="
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
-            echo "=== Waiting for startup ==="
-            sleep 10
+            echo "=== Waiting for backend to become healthy ==="
+            for i in 1 2 3 4 5 6; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health)
+              echo "Attempt $i: HTTP $STATUS"
+              [ "$STATUS" = "200" ] && break
+              sleep 5
+            done
 
-            echo "=== Testing nginx /api proxy ==="
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health)
-            echo "Proxy health check: $STATUS"
             if [ "$STATUS" != "200" ]; then
               echo "FAIL — dumping logs"
               docker-compose logs --tail=40 frontend
