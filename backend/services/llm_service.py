@@ -96,11 +96,11 @@ class QwenStrategy(LLMStrategy):
 
 
 class GeminiStrategy(LLMStrategy):
-    """Strategy for Gemini 3 Flash via Google API."""
+    """Strategy for Gemini 2.5 Flash via Google API."""
 
     def __init__(self):
         self.client = ChatGoogleGenerativeAI(
-            model="gemini-3-flash", google_api_key=settings.google_api_key
+            model="gemini-2.5-flash", google_api_key=settings.google_api_key
         )
 
     async def generate(
@@ -154,7 +154,15 @@ class LLMService:
     """Orchestrator for managing LLM interactions."""
 
     def __init__(self):
-        self.strategies = {"qwen": QwenStrategy(), "gemini": GeminiStrategy()}
+        self.strategies: Dict[str, LLMStrategy] = {"gemini": GeminiStrategy()}
+        # Only register Qwen if a real base URL is configured
+        if settings.qwen_base_url and settings.qwen_api_key:
+            try:
+                self.strategies["qwen"] = QwenStrategy()
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).warning(f"Qwen strategy unavailable: {e}")
 
     def calculate_cost(
         self, model: str, input_tokens: int, output_tokens: int

@@ -30,8 +30,8 @@ class Settings(BaseSettings):
 
     # LLM Models Settings
     google_api_key: str
-    qwen_base_url: str
-    qwen_api_key: str
+    qwen_base_url: str = ""
+    qwen_api_key: str = ""
 
     # MLFlow Settings
     mlflow_tracking_uri: str
