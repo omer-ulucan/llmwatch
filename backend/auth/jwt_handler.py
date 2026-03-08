@@ -7,30 +7,42 @@ WHY: Custom stateless token management avoids database hits for 99% of requests,
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from config import settings
 from exceptions import AuthenticationException
 
 # WHY: bcrypt with 12 rounds is industry standard for secure hashing.
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+BCRYPT_ROUNDS = 12
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Compare plain password with its hash.
 
-    WHY: passlib raises ValueError when the hash is empty, malformed, or uses an
-    unknown scheme.  Catching it here prevents a 500 from leaking through to the
-    caller and treats a corrupt hash the same as a wrong password.
+    WHY: bcrypt.checkpw raises ValueError when the hash is empty, malformed, or
+    uses an unknown scheme.  Catching it here prevents a 500 from leaking through
+    to the caller and treats a corrupt hash the same as a wrong password.
     """
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        if not plain_password or not hashed_password:
+            return False
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8"),
+        )
     except (ValueError, TypeError):
         return False
 
 
 def get_password_hash(password: str) -> str:
-    """Hash the password securely."""
-    return pwd_context.hash(password)
+    """Hash the password securely using bcrypt directly.
+
+    WHY: Using bcrypt directly avoids the passlib compatibility issue with
+    bcrypt>=4.1 on Python 3.14 (passlib's _detect_wrap_bug sends a 255-byte
+    secret that newer bcrypt rejects).
+    """
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 
 def create_access_token(

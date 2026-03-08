@@ -12,66 +12,52 @@ from auth.jwt_handler import (
     decode_access_token,
     verify_password,
     get_password_hash,
-    pwd_context,
 )
 from exceptions import AuthenticationException
 
 
 # ── Password hashing ─────────────────────────────────────────────────────
-# NOTE: passlib has a known incompatibility with bcrypt>=4.1 on Python 3.14
-# (detect_wrap_bug sends a 255-byte secret that newer bcrypt rejects).
-# We test through a mock to validate the application's usage of CryptContext
-# while avoiding the upstream bug.
-
-
-def _bcrypt_available() -> bool:
-    """Check if passlib bcrypt backend works in this environment."""
-    try:
-        get_password_hash("probe")
-        return True
-    except (ValueError, Exception):
-        return False
-
-
-_skip_bcrypt = pytest.mark.skipif(
-    not _bcrypt_available(),
-    reason="passlib bcrypt backend broken on this Python/bcrypt version",
-)
 
 
 class TestPasswordHashing:
-    @_skip_bcrypt
     def test_hash_and_verify(self):
         raw = "my_secure_password"
         hashed = get_password_hash(raw)
         assert hashed != raw
         assert verify_password(raw, hashed)
 
-    @_skip_bcrypt
     def test_wrong_password_fails(self):
         hashed = get_password_hash("correct")
         assert not verify_password("wrong", hashed)
 
-    @_skip_bcrypt
     def test_hashes_are_unique(self):
         h1 = get_password_hash("same")
         h2 = get_password_hash("same")
         # bcrypt salts should make them different
         assert h1 != h2
 
-    def test_hash_calls_pwd_context(self):
-        """Verify get_password_hash delegates to pwd_context.hash (works without bcrypt)."""
-        with patch.object(pwd_context, "hash", return_value="$2b$12$fake") as mock_hash:
-            result = get_password_hash("secret")
-            mock_hash.assert_called_once_with("secret")
-            assert result == "$2b$12$fake"
+    def test_hash_produces_bcrypt_format(self):
+        """get_password_hash should produce a standard bcrypt hash string."""
+        hashed = get_password_hash("secret")
+        assert hashed.startswith("$2b$12$")  # bcrypt prefix with 12 rounds
 
-    def test_verify_calls_pwd_context(self):
-        """Verify verify_password delegates to pwd_context.verify (works without bcrypt)."""
-        with patch.object(pwd_context, "verify", return_value=True) as mock_verify:
-            result = verify_password("plain", "$2b$12$hash")
-            mock_verify.assert_called_once_with("plain", "$2b$12$hash")
+    def test_verify_delegates_to_bcrypt(self):
+        """verify_password should call bcrypt.checkpw under the hood."""
+        with patch("auth.jwt_handler.bcrypt") as mock_bcrypt:
+            mock_bcrypt.checkpw.return_value = True
+            result = verify_password("plain", "$2b$12$somehash")
+            mock_bcrypt.checkpw.assert_called_once_with(b"plain", b"$2b$12$somehash")
             assert result is True
+
+    def test_hash_delegates_to_bcrypt(self):
+        """get_password_hash should call bcrypt.gensalt and bcrypt.hashpw."""
+        with patch("auth.jwt_handler.bcrypt") as mock_bcrypt:
+            mock_bcrypt.gensalt.return_value = b"$2b$12$fakesalt"
+            mock_bcrypt.hashpw.return_value = b"$2b$12$fakehashed"
+            result = get_password_hash("secret")
+            mock_bcrypt.gensalt.assert_called_once_with(rounds=12)
+            mock_bcrypt.hashpw.assert_called_once_with(b"secret", b"$2b$12$fakesalt")
+            assert result == "$2b$12$fakehashed"
 
 
 # ── Token creation / decoding ────────────────────────────────────────────
