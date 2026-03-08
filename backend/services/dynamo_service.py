@@ -126,6 +126,40 @@ class DynamoDBService:
             logger.error(f"DynamoDB get_logs error: {e.response['Error']['Message']}")
             raise DatabaseException("Failed to retrieve logs.")
 
+    def save_user(self, user_data: Dict[str, Any]) -> str:
+        """
+        Saves a new user to DynamoDB with atomic email uniqueness enforcement.
+
+        WHY: Using a ConditionExpression on the email attribute prevents a race condition
+        where two concurrent registrations with the same email could both succeed when
+        relying on a separate get_user_by_email check.
+
+        Args:
+            user_data (Dict[str, Any]): The user record including company_id, email,
+                hashed_password, etc.
+
+        Returns:
+            str: The user_id of the newly created user.
+
+        Raises:
+            ValidationException: If the email is already registered (ConditionalCheckFailed).
+            DatabaseException: If the underlying PutItem request fails for any other reason.
+        """
+        from exceptions import ValidationException
+
+        try:
+            self.users_table.put_item(
+                Item=user_data,
+                ConditionExpression="attribute_not_exists(email)",
+            )
+            return user_data.get("user_id", "")
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "ConditionalCheckFailedException":
+                raise ValidationException("Email already registered")
+            logger.error(f"DynamoDB save_user error: {e.response['Error']['Message']}")
+            raise DatabaseException("Failed to save user.")
+
     # ── Agent Trace Methods ────────────────────────────────
 
     def save_trace(self, company_id: str, trace_data: Dict[str, Any]) -> str:

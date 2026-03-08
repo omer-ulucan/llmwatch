@@ -37,16 +37,11 @@ async def register(request: Request, data: RegisterRequest):
             "company_id": f"demo-{uuid.uuid4().hex[:8]}",
         }
 
-    existing_user = get_dynamo_service().get_user_by_email(data.email)
-    if existing_user:
-        # WHY: Generic validation exception, keeping status format standardized by top-level handler
-        raise ValidationException("Email already registered")
-
     company_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
     hashed_pwd = get_password_hash(data.password)
 
-    item = {
+    user_record = {
         "company_id": company_id,
         "email": data.email,
         "company_name": data.company_name,
@@ -56,10 +51,9 @@ async def register(request: Request, data: RegisterRequest):
         "is_active": True,
     }
 
-    # Normally we'd insert this record in DynamoDB users_table
-    # Since DynamoDBService in our boilerplate didn't explicitly implement put_user,
-    # we manually call put_item on users_table for completion.
-    get_dynamo_service().users_table.put_item(Item=item)
+    # WHY: save_user() uses a ConditionExpression for atomic email uniqueness,
+    # preventing race conditions that the old check-then-write pattern allowed.
+    get_dynamo_service().save_user(user_record)
 
     return {"message": "User registered successfully", "company_id": company_id}
 
