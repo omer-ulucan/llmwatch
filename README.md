@@ -303,6 +303,31 @@ See [`.env.example`](.env.example) for the full list:
 | `MLFLOW_TRACKING_URI` | MLFlow server URL | Yes |
 | `CORS_ORIGINS` | Allowed CORS origins | Yes |
 
+## How LLMWatch Compares
+
+| Capability | LLMWatch | LangSmith | Helicone | Arize AI | Weights & Biases |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **LLM Gateway / Routing** | Yes | No | Proxy only | No | No |
+| **AI Agent Orchestration** | Yes (ReAct + tools) | No | No | No | No |
+| **Agent Execution Tracing** | Yes (step-level SSE) | Yes | No | No | No |
+| **Observability Dashboard** | Yes | Yes | Yes | Yes | Yes |
+| **Cost & Latency Tracking** | Yes | Yes | Yes | Yes | Partial |
+| **API Key Management** | Yes (per-key usage) | Yes | Yes | No | No |
+| **Dual Auth (JWT + API Key)** | Yes | No | No | No | No |
+| **Multi-Model Support** | Yes (Gemini, Qwen, OpenAI-compat) | LangChain models | OpenAI-compat | Any | Any |
+| **Self-Hostable** | Yes (Docker Compose) | No (cloud only) | Yes | No | No |
+| **Open Source** | Yes | Partial | Yes | No | No |
+| **MLFlow Integration** | Yes (built-in) | No | No | No | No |
+| **Multi-Tenant Isolation** | Yes (company-scoped) | Yes | Yes | Yes | Yes |
+| **Real-Time Streaming** | Yes (SSE) | Yes | No | No | No |
+
+### Key Differentiators
+
+- **All-in-one platform:** LLMWatch combines LLM routing, agent orchestration, observability, and API management in a single self-hosted solution. Competitors typically cover only one or two of these.
+- **Agent-first design:** Built-in ReAct agent with 4 tools and full execution tracing -- not just passive monitoring but active orchestration.
+- **Self-hosted & open:** Deploy on your own infrastructure with Docker Compose. No vendor lock-in, no data leaving your network.
+- **Enterprise API keys:** SHA-256 hashed keys with per-key usage tracking, rotation, and revocation -- same security model as Stripe and OpenAI.
+
 ## License
 
 Private -- All rights reserved.
