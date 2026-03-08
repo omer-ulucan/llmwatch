@@ -96,11 +96,11 @@ class QwenStrategy(LLMStrategy):
 
 
 class GeminiStrategy(LLMStrategy):
-    """Strategy for Gemini 2.5 Flash via Google API."""
+    """Strategy for Gemini 3 Flash Preview via Google API."""
 
     def __init__(self):
         self.client = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", google_api_key=settings.google_api_key
+            model="gemini-3-flash-preview", google_api_key=settings.google_api_key
         )
 
     async def generate(

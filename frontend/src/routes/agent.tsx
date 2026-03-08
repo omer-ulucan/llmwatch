@@ -72,7 +72,7 @@ const Agent: React.FC = () => {
             >
               <div className="flex justify-between items-center">
                 <span className="font-semibold capitalize text-foreground text-sm">
-                  {m === 'qwen' ? 'Qwen3.5-35B' : 'Gemini 2.5 Flash'}
+                  {m === 'qwen' ? 'Qwen3.5-35B' : 'Gemini 3 Flash'}
                 </span>
                 <div className={`w-2 h-2 rounded-full ${selectedModel === m ? 'bg-primary shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'bg-muted-foreground'}`} />
               </div>

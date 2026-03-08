@@ -88,7 +88,7 @@ const Chat: React.FC = () => {
               }`}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold capitalize text-foreground">{m === 'qwen' ? 'Qwen3.5-35B' : 'Gemini 2.5 Flash'}</span>
+                <span className="font-semibold capitalize text-foreground">{m === 'qwen' ? 'Qwen3.5-35B' : 'Gemini 3 Flash'}</span>
                 <div className={`w-2 h-2 rounded-full ${selectedModel === m ? 'bg-primary shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'bg-muted-foreground'}`} />
               </div>
               <span className="text-xs text-muted-foreground">{m === 'qwen' ? 'Self-hosted standard' : 'Google API'}</span>
