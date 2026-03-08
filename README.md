@@ -1,18 +1,25 @@
 # LLMWatch
 
-**AI Observability & Orchestration Platform**
+**LLMOps SaaS Platform -- AI Observability & Orchestration**
 
-LLMWatch is a full-stack platform for monitoring, comparing, and orchestrating Large Language Model deployments. It provides real-time cost tracking, latency monitoring, model comparison (self-hosted vs. managed), and an autonomous ReAct agent with full execution tracing.
+LLMWatch is a full-stack LLMOps platform for monitoring, orchestrating, and securing Large Language Model deployments. It provides a unified API gateway for multi-model routing, autonomous AI agent orchestration with full execution tracing, real-time cost and latency analytics, and enterprise API key management with per-key usage tracking.
+
+## Live Demo
+
+- **App:** http://3.236.50.182:3000
+- **API:** http://3.236.50.182:3000/api
 
 ## Features
 
-- **Multi-Model Routing** -- Switch between self-hosted Qwen (via vLLM) and Google Gemini with a single toggle. Strategy pattern enables zero-downtime model swaps.
-- **Real-Time Analytics Dashboard** -- Track cost, latency, request volume, and error rates across all models with live-updating charts (Recharts).
-- **Reasoning Mode** -- Enable deep thinking mode to see the LLM's chain-of-thought reasoning traces alongside responses.
-- **Autonomous Agent** -- LangChain ReAct agent with 4 tools (web search, code execution, DB query, document analysis) and real-time step-by-step execution streaming via SSE.
+- **Multi-Model LLM Gateway** -- Route requests to multiple models (Gemini 3 Flash, Qwen via vLLM, any OpenAI-compatible endpoint) through a single API. Strategy pattern enables zero-downtime model swaps.
+- **Autonomous AI Agents** -- LangChain ReAct agent with 4 tools (web search, code execution, DB query, document analysis) and real-time step-by-step execution streaming via SSE.
+- **Real-Time Analytics Dashboard** -- Track cost, latency, request volume, and error rates across all models with live-updating charts.
 - **Agent Trace Viewer** -- Full execution trace storage in DynamoDB with timeline visualization, tool usage breakdown, and per-step latency metrics.
+- **API Key Management** -- Create, list, regenerate, and revoke API keys for programmatic access. Per-key usage tracking (request count, last used). Keys are SHA-256 hashed at rest.
+- **Dual Authentication** -- All protected endpoints accept either JWT Bearer token (browser login) or `X-API-Key` header (programmatic access).
 - **MLFlow Integration** -- Every LLM call is logged to MLFlow for experiment tracking, model comparison, and metric aggregation.
 - **Multi-Tenant Security** -- JWT authentication with company-scoped data isolation. All DynamoDB queries are partitioned by `company_id`.
+- **Reasoning Mode** -- Enable deep thinking mode to see the LLM's chain-of-thought reasoning traces alongside responses.
 - **Export & Search** -- Filter and search raw invocation logs, export to CSV.
 
 ## Architecture
@@ -22,17 +29,18 @@ LLMWatch is a full-stack platform for monitoring, comparing, and orchestrating L
 │   React 19 SPA       │  TypeScript, Vite 6, Tailwind v4
 │   (Nginx :3000)      │  React Router v7, Zustand, Framer Motion
 └──────────┬───────────┘
-           │ JWT / REST API
+           │ JWT / X-API-Key / REST API
 ┌──────────▼───────────┐
 │   FastAPI Server     │  Python 3.11, Pydantic v2
-│   (Uvicorn :8000)    │  LangChain, slowapi, JWT auth
+│   (Uvicorn :8000)    │  LangChain, slowapi, JWT + API Key auth
 └──────────┬───────────┘
            │
      ┌─────┼──────────┬────────────────┐
      │     │          │                │
 ┌────▼──┐ ┌▼───────┐ ┌▼────────────┐ ┌▼──────────┐
 │ Qwen  │ │Gemini  │ │ DynamoDB    │ │  MLFlow   │
-│(vLLM) │ │(Google)│ │ (3 tables)  │ │ (Docker)  │
+│(vLLM) │ │(Google)│ │ (4 tables)  │ │ (Docker)  │
+│ opt.  │ │        │ │             │ │           │
 └───────┘ └────────┘ └─────────────┘ └───────────┘
 ```
 
@@ -40,10 +48,10 @@ LLMWatch is a full-stack platform for monitoring, comparing, and orchestrating L
 
 | Service | Purpose |
 |---|---|
-| `LLMService` | Strategy-based model routing (Qwen/Gemini) |
+| `LLMService` | Strategy-based model routing (Gemini/Qwen) |
 | `AgentService` | ReAct agent orchestration with async SSE streaming |
 | `TracingService` | LangChain callback handler for step capture |
-| `DynamoDBService` | Multi-tenant data access (logs, users, traces) |
+| `DynamoDBService` | Multi-tenant data access (logs, users, traces, API keys) |
 | `MLFlowService` | Async experiment logging and metric tracking |
 
 ### Agent Tools
@@ -57,20 +65,53 @@ LLMWatch is a full-stack platform for monitoring, comparing, and orchestrating L
 
 ### DynamoDB Tables
 
-| Table | PK | SK | Purpose |
+| Table | PK | SK / GSI | Purpose |
 |---|---|---|---|
 | `llmwatch_logs` | `company_id` | `timestamp#log_id` | LLM call logs |
 | `llmwatch_users` | `company_id` | `user_id` | User accounts |
 | `llmwatch_traces` | `company_id` | `run_ts#run_id` | Agent execution traces |
+| `llmwatch_api_keys` | `key_hash` | GSI: `company_id-index`, `key_id-index` | API key auth & management |
+
+## Programmatic Access (API Keys)
+
+API keys enable programmatic access without browser login. Create a key from the Settings page, then use the `X-API-Key` header with any endpoint.
+
+### Chat Completion
+```bash
+curl http://YOUR_HOST:3000/api/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: lw_YOUR_KEY_HERE" \
+  -d '{"prompt":"Explain quantum computing","model":"gemini","thinking_mode":false}'
+```
+
+### Run an Agent
+```bash
+curl http://YOUR_HOST:3000/api/agent/run \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: lw_YOUR_KEY_HERE" \
+  -d '{"prompt":"Search the web for latest AI news","model":"gemini","tools":["web_search"],"max_iterations":5}'
+```
+
+### Get Analytics
+```bash
+curl http://YOUR_HOST:3000/api/analytics/summary \
+  -H "X-API-Key: lw_YOUR_KEY_HERE"
+```
+
+### List API Keys
+```bash
+curl http://YOUR_HOST:3000/api/api-keys \
+  -H "X-API-Key: lw_YOUR_KEY_HERE"
+```
 
 ## Tech Stack
 
 ### Backend
 - Python 3.11 / FastAPI / Uvicorn
-- LangChain (ReAct agent + model routing)
+- LangChain 0.3.x (ReAct agent + model routing)
 - Pydantic v2 (validation + settings)
 - boto3 (DynamoDB)
-- MLFlow 2.14+
+- MLFlow 3.x
 - python-jose (JWT)
 - slowapi (rate limiting)
 - duckduckgo-search (agent web search)
@@ -87,30 +128,35 @@ LLMWatch is a full-stack platform for monitoring, comparing, and orchestrating L
 - Lucide React (icons)
 
 ### Infrastructure
-- Docker Compose (3 services)
-- Nginx (frontend reverse proxy + SPA routing)
-- MLFlow (SQLite backend, local artifact storage)
+- Docker Compose (3 services: backend, frontend, MLFlow)
+- Nginx (frontend reverse proxy + SPA routing + API proxy)
+- AWS EC2 (production deployment)
+- AWS DynamoDB (4 tables, PAY_PER_REQUEST)
+- GitHub Actions (CI/CD auto-deploy on push to main)
 
 ## Project Structure
 
 ```
 llmwatch/
 ├── backend/
-│   ├── auth/              # JWT handler + auth dependencies
+│   ├── auth/              # JWT handler + dual auth (JWT + API key)
 │   ├── middleware/         # CORS, security headers
 │   ├── models/            # Pydantic schemas
 │   ├── routers/           # FastAPI route handlers
 │   │   ├── agent.py       # SSE streaming + trace endpoints
 │   │   ├── analytics.py   # Metrics + log queries
+│   │   ├── api_keys.py    # API key CRUD (create/list/regenerate/revoke)
 │   │   ├── auth.py        # Login/register
 │   │   └── chat.py        # LLM completions
+│   ├── scripts/           # DB setup utilities
+│   │   └── create_api_keys_table.py
 │   ├── services/          # Business logic layer
 │   │   ├── agent_service.py    # ReAct agent orchestration
-│   │   ├── dynamo_service.py   # DynamoDB CRUD
+│   │   ├── dynamo_service.py   # DynamoDB CRUD (logs, users, traces, API keys)
 │   │   ├── llm_service.py      # Model strategy routing
 │   │   ├── mlflow_service.py   # Experiment tracking
 │   │   └── tracing_service.py  # Callback handler + events
-│   ├── tests/             # pytest suite (55+ tests)
+│   ├── tests/             # pytest suite (144+ tests)
 │   ├── tools/             # LangChain agent tools
 │   │   ├── web_search.py
 │   │   ├── code_executor.py
@@ -123,23 +169,21 @@ llmwatch/
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── api/           # Axios client + agent API
+│   │   ├── api/           # Axios client, agent API, settings API
 │   │   ├── components/
 │   │   │   ├── agent/     # AgentStepCard, Timeline, ToolConfig, SummaryCard
 │   │   │   ├── Dashboard/ # MetricCard
 │   │   │   └── Layout/    # Sidebar, Navbar
 │   │   ├── hooks/         # useAgentStream (POST + SSE)
-│   │   ├── routes/        # Page components
+│   │   ├── routes/        # Page components (dashboard, chat, agent, settings)
 │   │   ├── store/         # Zustand store
 │   │   └── types/         # TypeScript interfaces
 │   ├── nginx.conf
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── Dockerfile
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── CHANGELOG.md
-│   └── epochs/            # Development phase planning
+├── .github/workflows/
+│   └── deploy.yml         # CI/CD: auto-deploy to EC2 on push to main
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
@@ -152,18 +196,19 @@ llmwatch/
 - Docker & Docker Compose
 - Node.js 22+ (for local frontend development)
 - Python 3.11+ (for local backend development)
-- AWS credentials (for DynamoDB) or DynamoDB Local
+- AWS credentials (for DynamoDB)
+- Google API key (for Gemini)
 
 ### Environment Setup
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/omer-ulucan/llmwatch.git
 cd llmwatch
 
 # Copy environment template
-cp .env.example .env
-# Edit .env with your actual values (API keys, JWT secret, etc.)
+cp .env.example backend/.env
+# Edit backend/.env with your actual values (API keys, JWT secret, AWS creds)
 ```
 
 ### Run with Docker Compose
@@ -173,8 +218,8 @@ docker compose up --build
 ```
 
 This starts three services:
-- **Backend** (FastAPI): http://localhost:8000
 - **Frontend** (Nginx): http://localhost:3000
+- **Backend** (FastAPI): http://localhost:8000
 - **MLFlow**: http://localhost:5000
 
 ### Local Development
@@ -185,7 +230,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+uvicorn main:app --port 8000
 ```
 
 **Frontend:**
@@ -205,30 +250,38 @@ pytest -v
 ## API Endpoints
 
 ### Authentication
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/auth/register` | Create account |
-| `POST` | `/auth/login` | Get JWT token |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/auth/register` | None | Create account |
+| `POST` | `/auth/login` | None | Get JWT token |
 
 ### Chat
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/chat/completions` | LLM inference with model routing |
-
-### Analytics
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/analytics/summary` | Aggregate KPIs |
-| `GET` | `/analytics/timeseries` | Time-series metrics |
-| `GET` | `/analytics/logs` | Raw invocation logs |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/chat/completions` | JWT or API Key | LLM inference with model routing |
 
 ### Agent
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/agent/run` | Execute agent (SSE stream) |
-| `GET` | `/agent/traces` | List recent traces |
-| `GET` | `/agent/traces/{run_id}` | Full trace detail |
-| `GET` | `/agent/analytics` | Agent aggregate metrics |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/agent/run` | JWT or API Key | Execute agent (SSE stream) |
+| `GET` | `/agent/traces` | JWT or API Key | List recent traces |
+| `GET` | `/agent/traces/{run_id}` | JWT or API Key | Full trace detail |
+| `GET` | `/agent/analytics` | JWT or API Key | Agent aggregate metrics |
+
+### Analytics
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/analytics/summary` | JWT or API Key | Aggregate KPIs |
+| `GET` | `/analytics/timeseries` | JWT or API Key | Time-series metrics |
+| `GET` | `/analytics/logs` | JWT or API Key | Raw invocation logs |
+
+### API Keys
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api-keys` | JWT or API Key | Create new API key (raw key returned once) |
+| `GET` | `/api-keys` | JWT or API Key | List all keys (masked) |
+| `POST` | `/api-keys/{key_id}/regenerate` | JWT or API Key | Rotate key (revoke old, issue new) |
+| `DELETE` | `/api-keys/{key_id}` | JWT or API Key | Permanently revoke key |
 
 ## Environment Variables
 
@@ -237,14 +290,16 @@ See [`.env.example`](.env.example) for the full list:
 | Variable | Description | Required |
 |---|---|---|
 | `AWS_REGION` | AWS region for DynamoDB | Yes |
-| `AWS_ACCESS_KEY_ID` | AWS credentials (optional with IAM roles) | No |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials (optional with IAM roles) | No |
+| `AWS_ACCESS_KEY_ID` | AWS credentials | Yes |
+| `AWS_SECRET_ACCESS_KEY` | AWS credentials | Yes |
 | `DYNAMODB_TABLE_LOGS` | Logs table name | Yes |
 | `DYNAMODB_TABLE_USERS` | Users table name | Yes |
 | `DYNAMODB_TABLE_TRACES` | Agent traces table name | Yes |
+| `DYNAMODB_TABLE_API_KEYS` | API keys table name | Yes |
 | `JWT_SECRET_KEY` | Secret for JWT signing (min 32 chars) | Yes |
 | `GOOGLE_API_KEY` | Google Gemini API key | Yes |
-| `QWEN_BASE_URL` | vLLM endpoint for Qwen | Yes |
+| `QWEN_BASE_URL` | vLLM endpoint for Qwen (optional) | No |
+| `QWEN_API_KEY` | Qwen API key (optional) | No |
 | `MLFLOW_TRACKING_URI` | MLFlow server URL | Yes |
 | `CORS_ORIGINS` | Allowed CORS origins | Yes |
 
