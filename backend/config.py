@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     dynamodb_table_logs: str
     dynamodb_table_users: str
     dynamodb_table_traces: str = "llmwatch_traces"
+    dynamodb_table_api_keys: str = "llmwatch_api_keys"
 
     # Auth Settings
     jwt_secret_key: str

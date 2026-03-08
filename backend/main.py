@@ -15,7 +15,7 @@ from config import settings, logger
 from exceptions import LLMWatchException
 from middleware.security import setup_security_middleware
 from rate_limit import limiter
-from routers import auth, chat, analytics, agent
+from routers import auth, chat, analytics, agent, api_keys
 
 
 # WHY: We apply slowapi rate limiters at the application layer to block abuse
@@ -81,6 +81,7 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(analytics.router)
 app.include_router(agent.router)
+app.include_router(api_keys.router)
 
 
 @app.get("/health", tags=["Health"])
