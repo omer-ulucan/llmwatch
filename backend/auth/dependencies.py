@@ -12,7 +12,9 @@ from exceptions import AuthenticationException
 
 # WHY: OAuth2PasswordBearer automatically looks for the Authorization: Bearer <token> header
 # and integrates directly with FastAPI's OpenAPI swagger documentation standard.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+# tokenUrl points to the form-encoded /auth/token endpoint (not the JSON /auth/login)
+# because Swagger UI sends application/x-www-form-urlencoded per the OAuth2 spec.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
