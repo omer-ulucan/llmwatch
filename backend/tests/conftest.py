@@ -19,13 +19,11 @@ _TEST_ENV = {
     "SECRET_KEY": "test-secret-key-for-jwt-do-not-use-in-prod",
     "JWT_ALGORITHM": "HS256",
     "JWT_EXPIRE_HOURS": "24",
-    "GOOGLE_API_KEY": "fake-google-key",
-    "QWEN_BASE_URL": "http://localhost:8000/v1",
-    "QWEN_API_KEY": "fake-qwen-key",
     "MLFLOW_TRACKING_URI": "http://localhost:5000",
     "APP_ENV": "testing",
     "APP_VERSION": "0.0.0-test",
     "CORS_ORIGINS": "http://localhost:3000",
+    # No provider env vars: tests configure providers explicitly.
     # Never touch a real database file from tests.
     "DATABASE_URL": "sqlite+aiosqlite:///:memory:",
 }

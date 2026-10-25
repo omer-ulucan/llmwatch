@@ -65,6 +65,10 @@ async def register(
         role="owner",
     )
     session.add(user)
+    # New workspaces get the providers configured through environment variables.
+    from llmwatch.providers.service import sync_env_providers
+
+    await sync_env_providers(session, workspace.id)
     try:
         await session.commit()
     except IntegrityError:
@@ -114,6 +118,9 @@ async def ensure_demo_account(session: AsyncSession) -> User:
         role="owner",
     )
     session.add(user)
+    from llmwatch.providers.service import sync_env_providers
+
+    await sync_env_providers(session, workspace.id)
     await session.commit()
     logger.info(f"Demo account created: {email}")
     return user

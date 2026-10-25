@@ -17,8 +17,17 @@ from llmwatch.db import migrate
 from llmwatch.db.engine import dispose_engine, get_sessionmaker, is_memory_sqlite
 from llmwatch.exceptions import LLMWatchException
 from llmwatch.middleware.security import setup_security_middleware
+from llmwatch.providers.service import sync_env_providers_all
 from llmwatch.rate_limit import limiter, rate_limit_exceeded_handler
-from llmwatch.routers import agent, analytics, api_keys, auth, chat, workspaces
+from llmwatch.routers import (
+    agent,
+    analytics,
+    api_keys,
+    auth,
+    chat,
+    providers,
+    workspaces,
+)
 from llmwatch.security.secrets import server_secret
 from llmwatch.services.accounts import ensure_demo_account
 
@@ -40,6 +49,12 @@ async def lifespan(app: FastAPI):
     if settings.demo_mode:
         async with get_sessionmaker()() as session:
             await ensure_demo_account(session)
+    # WHY: Only when we manage the schema; with AUTO_MIGRATE=false the operator
+    # does, and startup leaves the database alone (new workspaces still get the
+    # env providers when they register).
+    if settings.auto_migrate and not is_memory_sqlite(settings.database_url):
+        async with get_sessionmaker()() as session:
+            await sync_env_providers_all(session)
     logger.info(
         f"LLMWatch {settings.app_version} startup complete in environment: {settings.app_env}"
     )
@@ -115,6 +130,7 @@ app.include_router(analytics.router)
 app.include_router(agent.router)
 app.include_router(api_keys.router)
 app.include_router(workspaces.router)
+app.include_router(providers.router)
 
 
 @app.get("/health", tags=["Health"])
