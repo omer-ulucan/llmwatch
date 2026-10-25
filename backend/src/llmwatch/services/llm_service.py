@@ -110,7 +110,12 @@ class LLMService:
         """
         route = self.routes.get(model)
         if route is None:
-            raise LLMServiceException(f"Unsupported model: {model}", provider="system")
+            raise LLMServiceException(
+                f"Unsupported model: {model}",
+                provider="system",
+                http_status=400,
+                error_type="unsupported_model",
+            )
 
         try:
             result = await route.client.chat(
@@ -120,7 +125,11 @@ class LLMService:
             )
         except LLMError as err:
             exc = LLMServiceException(
-                f"{model} generation failed: {err.message}", provider=model
+                f"{model} generation failed: {err.message}",
+                provider=model,
+                http_status=err.http_status,
+                error_type=err.kind,
+                retry_after_s=err.retry_after_s,
             )
             exc.llm_error = err  # type: ignore[attr-defined]
             raise exc from err

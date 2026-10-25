@@ -58,11 +58,26 @@ class ConflictException(LLMWatchException):
 
 
 class LLMServiceException(LLMWatchException):
-    """Raised when interactions with external LLM APIs fail."""
+    """Raised when interactions with external LLM APIs fail.
 
-    def __init__(self, message: str, provider: str):
+    Carries the HTTP status to answer with (e.g. 429 for an upstream rate limit,
+    504 for a timeout), a short error_type, and the upstream Retry-After if any.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        provider: str,
+        *,
+        http_status: int = 502,
+        error_type: str = "unknown",
+        retry_after_s: float | None = None,
+    ):
         super().__init__(message, code="LLM_SERVICE_ERROR")
         self.provider = provider
+        self.http_status = http_status
+        self.error_type = error_type
+        self.retry_after_s = retry_after_s
 
 
 class DatabaseException(LLMWatchException):

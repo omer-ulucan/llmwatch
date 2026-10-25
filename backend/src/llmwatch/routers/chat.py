@@ -5,12 +5,14 @@ WHY: Chat interactions represent the core value proposition of the system.
 By injecting the JWT token dependencies we secure this route by default.
 """
 
+import time
 from typing import Any, Dict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from llmwatch.auth.dependencies import get_current_user
 from llmwatch.config import logger
+from llmwatch.exceptions import LLMServiceException
 from llmwatch.models.schemas import ChatCompletionRequest, ChatCompletionResponse
 from llmwatch.rate_limit import (
     chat_limit,
@@ -42,9 +44,31 @@ async def chat_completions(
     llm_service = get_llm_service()
 
     # Generate Response
-    result = await llm_service.execute_chat(
-        prompt=data.prompt, model=data.model, thinking_mode=data.thinking_mode
-    )
+    started = time.perf_counter()
+    try:
+        result = await llm_service.execute_chat(
+            prompt=data.prompt, model=data.model, thinking_mode=data.thinking_mode
+        )
+    except LLMServiceException as exc:
+        err = getattr(exc, "llm_error", None)
+        if err is not None:
+            # WHY: Failed calls count toward the error rate; logged before raising
+            # because background tasks don't run for error responses.
+            await record_llm_call(
+                workspace_id,
+                source="chat",
+                user_id=current_user["user_id"],
+                api_key_id=current_user["api_key_id"],
+                model_name=data.model,
+                prompt_preview=data.prompt,
+                latency_ms=(time.perf_counter() - started) * 1000,
+                thinking_mode=data.thinking_mode,
+                success=False,
+                error_type=err.kind,
+                error_message=err.message,
+                status_code=err.status,
+            )
+        raise
 
     # WHY: Logging runs after the response is sent, so the client never waits on it.
     # record_llm_call stores to the database and logs (rather than hides) failures.
