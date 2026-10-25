@@ -154,7 +154,6 @@ async def proxied(app_db, trusted_proxies, monkeypatch):
     transport = httpx.ASGITransport(app=app, client=("172.18.0.5", 50000))
     with (
         patch("llmwatch.routers.chat.get_llm_service", return_value=llm),
-        patch("llmwatch.routers.chat.get_dynamo_service"),
         patch("llmwatch.routers.chat.get_mlflow_service"),
     ):
         async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
@@ -211,7 +210,6 @@ async def test_agent_run_is_rate_limited(client, make_account, monkeypatch):
     body = {"prompt": "hi", "model": "gemini", "tools": []}
     with (
         patch("llmwatch.routers.agent.get_agent_service", return_value=agent),
-        patch("llmwatch.routers.agent.get_dynamo_service"),
         patch("llmwatch.routers.agent.get_mlflow_service"),
     ):
         first = await client.post("/agent/run", json=body, headers=alice.headers)

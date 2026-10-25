@@ -1,19 +1,22 @@
 """
 Module: db_query.py
-Purpose: Tool that lets the agent query the user's own LLM usage logs from DynamoDB.
+Purpose: Tool that lets the agent query the user's own LLM usage logs.
 WHY: Enables self-referential analytics — the agent can answer questions about the user's
 own LLM usage patterns, costs, and performance.
 """
 
+import asyncio
 from typing import Any, Dict, List
 
 from langchain_core.tools import tool
 
 from llmwatch.config import logger
 
+QUERY_TIMEOUT_S = 10
+
 
 def _format_logs_summary(logs: List[Dict[str, Any]]) -> str:
-    """Format DynamoDB logs into a readable summary string for the agent."""
+    """Format usage logs into a readable summary string for the agent."""
     if not logs:
         return "No LLM usage logs found for this account."
 
@@ -67,13 +70,25 @@ Model Breakdown:
     return summary
 
 
-def make_db_query_tool(company_id: str, dynamo_service: Any = None):
+def make_db_query_tool(company_id: str, loop: asyncio.AbstractEventLoop | None = None):
     """
-    Factory that creates a db_query tool bound to a specific company_id.
-    WHY: The company_id comes from the authenticated user's JWT, so we inject it
-    at tool creation time rather than trusting the agent to provide it.
+    Factory that creates a db_query tool bound to a specific workspace.
+    WHY: The workspace comes from the authenticated user, so we inject it at tool
+    creation time rather than trusting the agent to provide it.
+
+    The LangChain agent calls tools from a worker thread, but the database engine
+    belongs to the server's event loop, so the query is handed back to that loop.
     """
-    from llmwatch.services.dynamo_service import get_dynamo_service
+    from llmwatch.services.observability import log_to_dict, recent_logs_for
+
+    if loop is None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+    async def _fetch() -> list[dict[str, Any]]:
+        return [log_to_dict(log) for log in await recent_logs_for(company_id, 100)]
 
     @tool
     def query_llm_logs(question: str) -> str:
@@ -84,8 +99,12 @@ def make_db_query_tool(company_id: str, dynamo_service: Any = None):
         - Show me my recent usage
         The tool fetches your actual usage data and provides a summary for analysis."""
         try:
-            svc = dynamo_service or get_dynamo_service()
-            logs = svc.get_logs(company_id, limit=100)
+            if loop is not None and loop.is_running():
+                logs = asyncio.run_coroutine_threadsafe(_fetch(), loop).result(
+                    timeout=QUERY_TIMEOUT_S
+                )
+            else:
+                logs = asyncio.run(_fetch())
             return _format_logs_summary(logs)
         except Exception as e:
             logger.error(f"DB query tool error: {str(e)}")
