@@ -172,3 +172,81 @@ def make_account(app_db):
         return Account(user, ws, password, token)
 
     return _make
+
+
+@pytest.fixture
+def fake_llm(monkeypatch):
+    """Every provider client talks to one fake OpenAI-compatible server.
+
+    fake_llm.configs records the ProviderConfig each client was built with.
+    """
+    from llmwatch.llm import LLMClient
+    from llmwatch.providers import service
+    from tests.fake_llm import FakeProvider
+
+    fake = FakeProvider(models=["fake-model"])
+    fake.configs = []
+
+    def make_client(config):
+        fake.configs.append(config)
+        return LLMClient(config, http_client=fake.http_client())
+
+    monkeypatch.setattr(service, "make_client", make_client)
+    return fake
+
+
+@pytest.fixture
+def add_model(app_db):
+    """Factory: add_model(account, model_id=..., preset=..., ...) -> Model row."""
+
+    async def _add(
+        account,
+        model_id: str = "fake-model",
+        *,
+        preset: str = "openai",
+        provider_name: str = "Fake",
+        input_price: float | None = 1.0,
+        output_price: float | None = 2.0,
+        supports_reasoning: bool = False,
+        supports_tools: bool = True,
+        is_default: bool = False,
+    ):
+        from sqlalchemy import select
+
+        from llmwatch.db.engine import get_sessionmaker
+        from llmwatch.db.models import Model, Provider
+
+        async with get_sessionmaker()() as session:
+            provider = (
+                await session.execute(
+                    select(Provider).where(
+                        Provider.workspace_id == account.workspace_id,
+                        Provider.name == provider_name,
+                    )
+                )
+            ).scalar_one_or_none()
+            if provider is None:
+                provider = Provider(
+                    workspace_id=account.workspace_id,
+                    name=provider_name,
+                    preset=preset,
+                    base_url="http://fake.local/v1",
+                )
+                session.add(provider)
+                await session.flush()
+            model = Model(
+                workspace_id=account.workspace_id,
+                provider_id=provider.id,
+                model_id=model_id,
+                display_name=model_id,
+                input_price_per_mtok=input_price,
+                output_price_per_mtok=output_price,
+                supports_reasoning=supports_reasoning,
+                supports_tools=supports_tools,
+                is_default=is_default,
+            )
+            session.add(model)
+            await session.commit()
+            return model
+
+    return _add

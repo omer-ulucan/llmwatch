@@ -81,17 +81,47 @@ class TestChatCompletionRequest:
         r = ChatCompletionRequest(prompt="explain", model="gemini", thinking_mode=True)
         assert r.thinking_mode is True
 
-    def test_invalid_model_rejected(self):
+    def test_any_model_reference_is_accepted_at_the_schema_level(self):
+        # Whether it exists is checked against the workspace registry (400).
+        assert ChatCompletionRequest(prompt="hi", model="OpenAI/gpt-x").model
+
+    def test_empty_model_rejected(self):
         with pytest.raises(ValidationError):
-            ChatCompletionRequest(prompt="hi", model="gpt4")
+            ChatCompletionRequest(prompt="hi", model="")
 
     def test_prompt_too_long(self):
         with pytest.raises(ValidationError):
-            ChatCompletionRequest(prompt="x" * 10001, model="qwen")
+            ChatCompletionRequest(prompt="x" * 50_001, model="qwen")
 
     def test_extra_fields_forbidden(self):
         with pytest.raises(ValidationError):
-            ChatCompletionRequest(prompt="hi", model="qwen", temperature=0.9)
+            ChatCompletionRequest(prompt="hi", model="qwen", foo="bar")
+
+    def test_prompt_or_messages_required(self):
+        with pytest.raises(ValidationError):
+            ChatCompletionRequest(model="qwen")
+
+    def test_messages_history(self):
+        r = ChatCompletionRequest(
+            model="qwen",
+            messages=[
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "hello"},
+            ],
+            temperature=0.2,
+        )
+        assert [m.role for m in r.messages] == ["user", "assistant"]
+
+    def test_unknown_message_role_rejected(self):
+        with pytest.raises(ValidationError):
+            ChatCompletionRequest(
+                model="qwen", messages=[{"role": "tool", "content": "x"}]
+            )
+
+    @pytest.mark.parametrize("field,value", [("temperature", 3), ("top_p", 0)])
+    def test_sampling_params_are_bounded(self, field, value):
+        with pytest.raises(ValidationError):
+            ChatCompletionRequest(prompt="hi", model="qwen", **{field: value})
 
 
 # ── ChatCompletionResponse ───────────────────────────────────────────────
