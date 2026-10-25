@@ -13,7 +13,8 @@ from pydantic import ValidationError
 from llmwatch.config import Settings
 
 
-@pytest.mark.parametrize("secret", ["", "short", "x" * 31])
+# Empty means "unset": a secret is then generated (see test_secret_key.py).
+@pytest.mark.parametrize("secret", ["short", "x" * 31])
 def test_short_jwt_secret_rejected(monkeypatch, secret):
     monkeypatch.setenv("JWT_SECRET_KEY", secret)
     with pytest.raises(ValidationError, match="at least 32"):

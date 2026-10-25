@@ -23,7 +23,7 @@ _TEST_ENV = {
     "DYNAMODB_TABLE_USERS": "test-users",
     "DYNAMODB_TABLE_TRACES": "test-traces",
     "DYNAMODB_TABLE_API_KEYS": "test-api-keys",
-    "JWT_SECRET_KEY": "test-secret-key-for-jwt-do-not-use-in-prod",
+    "SECRET_KEY": "test-secret-key-for-jwt-do-not-use-in-prod",
     "JWT_ALGORITHM": "HS256",
     "JWT_EXPIRE_HOURS": "24",
     "GOOGLE_API_KEY": "fake-google-key",
@@ -49,7 +49,7 @@ for key, value in _TEST_ENV.items():
 @pytest.fixture
 def jwt_secret():
     """Return the JWT secret used in tests."""
-    return _TEST_ENV["JWT_SECRET_KEY"]
+    return _TEST_ENV["SECRET_KEY"]
 
 
 @pytest.fixture

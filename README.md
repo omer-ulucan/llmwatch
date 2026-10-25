@@ -291,7 +291,7 @@ See [`.env.example`](.env.example) for the full list:
 | `DYNAMODB_TABLE_USERS` | Users table name | Yes |
 | `DYNAMODB_TABLE_TRACES` | Agent traces table name | Yes |
 | `DYNAMODB_TABLE_API_KEYS` | API keys table name | Yes |
-| `JWT_SECRET_KEY` | Secret for JWT signing (min 32 chars) | Yes |
+| `SECRET_KEY` | Server secret, min 32 chars. Generated and stored in `SECRET_KEY_FILE` if unset | No |
 | `GOOGLE_API_KEY` | Google Gemini API key | Yes |
 | `QWEN_BASE_URL` | vLLM endpoint for Qwen (optional) | No |
 | `QWEN_API_KEY` | Qwen API key (optional) | No |

@@ -494,7 +494,7 @@ cd llmwatch
 cp .env.example backend/.env
 
 # Edit backend/.env with your credentials
-# At minimum, set: JWT_SECRET_KEY, GOOGLE_API_KEY, CORS_ORIGINS`}
+# At minimum, set: GOOGLE_API_KEY, CORS_ORIGINS (SECRET_KEY is generated if unset)`}
           </CodeBlock>
 
           <h4 className="font-semibold mb-2 mt-6">2. Start the stack</h4>
@@ -1445,7 +1445,7 @@ def stream_agent(token: str, prompt: str):
               </thead>
               <tbody>
                 {[
-                  { name: 'JWT_SECRET_KEY', def: '—', req: true, desc: 'Secret key for signing JWTs, at least 32 characters. Use: openssl rand -hex 32' },
+                  { name: 'SECRET_KEY', def: 'generated', req: false, desc: 'Server secret (min 32 chars). Unset: generated once and stored in SECRET_KEY_FILE' },
                   { name: 'JWT_ALGORITHM', def: 'HS256', req: false, desc: 'JWT signing algorithm' },
                   { name: 'JWT_EXPIRE_HOURS', def: '24', req: false, desc: 'Token expiry in hours' },
                   { name: 'GOOGLE_API_KEY', def: '—', req: true, desc: 'Google Gemini API key' },
@@ -1482,7 +1482,7 @@ def stream_agent(token: str, prompt: str):
 
           <CodeBlock language="env" title="Example .env file">
 {`# Authentication
-JWT_SECRET_KEY=your-secret-key-generated-with-openssl-rand-hex-32
+SECRET_KEY=   # optional: openssl rand -hex 32
 JWT_ALGORITHM=HS256
 JWT_EXPIRE_HOURS=24
 
