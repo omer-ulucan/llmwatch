@@ -1,11 +1,43 @@
+# Secrets / local config
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
-node_modules/
+*.py[cod]
 .venv/
 venv/
-mlflow-artifacts/
-*.pyc
-dist/
-.DS_Store
-*.egg-info
+*.egg-info/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local data (SQLite databases, generated secrets)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# MLflow
+mlflow-artifacts/
+mlruns/
+
+# Logs
+*.log
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Agent tooling
+.opencode/
