@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     dynamodb_table_traces: str = "llmwatch_traces"
     dynamodb_table_api_keys: str = "llmwatch_api_keys"
 
+    # Database
+    # WHY: SQLite works with zero setup; set postgresql+asyncpg://... for Postgres
+    # (install the "postgres" extra).
+    database_url: str = "sqlite+aiosqlite:///./data/llmwatch.db"
+    db_echo: bool = False
+    # Apply pending Alembic migrations at startup.
+    auto_migrate: bool = True
+
     # Auth Settings
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"

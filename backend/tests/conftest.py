@@ -33,6 +33,8 @@ _TEST_ENV = {
     "APP_ENV": "testing",
     "APP_VERSION": "0.0.0-test",
     "CORS_ORIGINS": "http://localhost:3000",
+    # Never touch a real database file from tests.
+    "DATABASE_URL": "sqlite+aiosqlite:///:memory:",
 }
 
 for key, value in _TEST_ENV.items():
@@ -54,3 +56,24 @@ def jwt_secret():
 def jwt_algorithm():
     """Return the JWT algorithm used in tests."""
     return _TEST_ENV["JWT_ALGORITHM"]
+
+
+@pytest.fixture
+async def db_engine():
+    """A fresh in-memory SQLite database with the full schema."""
+    from llmwatch.db.engine import create_engine
+    from llmwatch.db.models import Base
+
+    engine = create_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(db_engine):
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    async with async_sessionmaker(db_engine, expire_on_commit=False)() as session:
+        yield session
