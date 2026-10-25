@@ -8,6 +8,7 @@ rather than failing unexpectedly at runtime.
 import logging
 from typing import List, Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,9 +38,10 @@ class Settings(BaseSettings):
     # MLFlow Settings
     mlflow_tracking_uri: str
 
-    # Demo Mode — allows login with hardcoded credentials without a database.
-    # WHY: Enables running the app locally or at demos without DynamoDB.
-    demo_mode: bool = True
+    # Demo Mode — allows login with shared demo credentials.
+    # WHY: Handy for local demos, but the credentials are public, so it is off by
+    # default and refused when APP_ENV=production (see _refuse_demo_in_production).
+    demo_mode: bool = False
 
     # Agent Python code execution
     # WHY: The python tool runs model-written code as a subprocess of the backend. It
@@ -61,6 +63,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def _refuse_demo_in_production(self) -> "Settings":
+        if self.demo_mode and self.app_env == "production":
+            raise ValueError(
+                "DEMO_MODE=true is not allowed when APP_ENV=production: demo "
+                "credentials are public. Unset DEMO_MODE or use another APP_ENV."
+            )
+        return self
 
     def get_cors_origins(self) -> List[str]:
         """

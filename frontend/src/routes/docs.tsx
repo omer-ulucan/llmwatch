@@ -541,6 +541,11 @@ npm run dev   # → http://localhost:5173`}
             <CodeBlock language="env" title=".env">
 {`DEMO_MODE=true`}
             </CodeBlock>
+            <p className="text-sm text-muted-foreground mt-3">
+              Demo mode is off by default and the server refuses to start with it when{' '}
+              <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">APP_ENV=production</code>.
+              The demo credentials are public, so never expose a demo instance to the internet.
+            </p>
           </div>
 
           <div className="glass-card rounded-2xl p-6 my-6">
@@ -1454,7 +1459,7 @@ def stream_agent(token: str, prompt: str):
                   { name: 'DYNAMODB_TABLE_TRACES', def: 'llmwatch_traces', req: false, desc: 'DynamoDB table for agent traces' },
                   { name: 'MLFLOW_TRACKING_URI', def: '—', req: true, desc: 'MLFlow tracking server URL' },
                   { name: 'CORS_ORIGINS', def: '—', req: true, desc: 'Comma-separated allowed CORS origins' },
-                  { name: 'DEMO_MODE', def: 'true', req: false, desc: 'Enable demo login without database' },
+                  { name: 'DEMO_MODE', def: 'false', req: false, desc: 'Enable the public demo login (refused when APP_ENV=production)' },
                   { name: 'APP_ENV', def: 'development', req: false, desc: 'Environment: development | production | testing' },
                   { name: 'APP_VERSION', def: '0.1.0', req: false, desc: 'Application version string' },
                 ].map((v) => (
@@ -1501,7 +1506,7 @@ MLFLOW_TRACKING_URI=http://localhost:5000
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 
 # App
-DEMO_MODE=true
+DEMO_MODE=false
 APP_ENV=development
 APP_VERSION=0.1.0`}
           </CodeBlock>
