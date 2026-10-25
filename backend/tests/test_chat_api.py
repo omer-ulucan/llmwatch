@@ -13,7 +13,9 @@ from llmwatch.config import settings
 
 
 async def _logs(client, account):
-    return (await client.get("/analytics/logs", headers=account.headers)).json()
+    return (await client.get("/analytics/logs", headers=account.headers)).json()[
+        "items"
+    ]
 
 
 @pytest.fixture

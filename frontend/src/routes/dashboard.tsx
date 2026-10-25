@@ -59,10 +59,16 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const comparisonData = summary ? [
-    { name: 'Requests', Qwen: summary.model_breakdown.qwen.requests, Gemini: summary.model_breakdown.gemini.requests },
-    { name: 'Cost ($)', Qwen: Number(summary.model_breakdown.qwen.cost.toFixed(4)), Gemini: Number(summary.model_breakdown.gemini.cost.toFixed(4)) },
-  ] : [];
+  // One bar group per model actually used in the window (top 6 by requests).
+  const comparisonData = summary
+    ? Object.entries(summary.model_breakdown)
+        .slice(0, 6)
+        .map(([name, m]) => ({
+          name: m.model || name,
+          Requests: m.requests,
+          'Cost ($)': Number(m.cost.toFixed(4)),
+        }))
+    : [];
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-12">
@@ -149,8 +155,8 @@ const Dashboard: React.FC = () => {
                    contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-card-border)', borderRadius: '12px' }}
                 />
                 <Legend iconType="circle" />
-                <Bar dataKey="Qwen" fill="var(--color-secondary)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Gemini" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Requests" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Cost ($)" fill="var(--color-secondary)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

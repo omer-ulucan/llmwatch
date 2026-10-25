@@ -6,7 +6,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Download, Search } from 'lucide-react';
 import { apiClient } from '@/api/client';
-import { LogEntry } from '@/types';
+import type { LogEntry, LogPage } from '@/types';
 import { format } from 'date-fns';
 
 const Analytics: React.FC = () => {
@@ -14,7 +14,7 @@ const Analytics: React.FC = () => {
   const [search, setSearch] = useState('');
   
   useEffect(() => {
-    apiClient.get('/analytics/logs?limit=100').then(res => setLogs(res.data)).catch(console.error);
+    apiClient.get<LogPage>('/analytics/logs', { params: { page_size: 100 } }).then(res => setLogs(res.data.items)).catch(console.error);
   }, []);
 
   const filteredLogs = logs.filter(log => 
