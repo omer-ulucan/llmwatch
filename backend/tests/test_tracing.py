@@ -291,6 +291,11 @@ class TestTracingCallbackHandler:
         handler._total_tokens = 200
         handler._total_cost = 0.0005
         handler._tools_used = ["web_search", "code_execute"]
+        # WHY: Backdate the run start so the measured latency doesn't depend on
+        # how fast the machine is (on fast CI runners it rounded to 0.0).
+        import time
+
+        handler._run_start_time = time.perf_counter() - 0.05
 
         summary = handler.build_summary(success=True)
 
@@ -301,7 +306,7 @@ class TestTracingCallbackHandler:
         assert summary.tools_used == ["web_search", "code_execute"]
         assert summary.model_used == "gemini"
         assert summary.success is True
-        assert summary.total_latency_ms > 0
+        assert 50 <= summary.total_latency_ms < 5000
 
     def test_build_trace_data(self):
         """Verify build_trace_data produces the dict stored for a trace."""
