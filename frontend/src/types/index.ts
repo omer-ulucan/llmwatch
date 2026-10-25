@@ -18,15 +18,41 @@ export interface AuthState {
   logout: () => void;
 }
 
+export interface ModelBreakdownEntry {
+  model: string;
+  provider: string | null;
+  requests: number;
+  errors: number;
+  cost: number;
+  avg_latency_ms: number;
+  input_tokens: number;
+  output_tokens: number;
+  error_rate_pct: number;
+}
+
 export interface MetricSummary {
+  window: { from: string; to: string };
   total_cost_usd: number;
   avg_latency_ms: number;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
   total_requests: number;
+  total_errors: number;
+  total_cancelled: number;
   error_rate_pct: number;
-  model_breakdown: {
-    qwen: { requests: number; cost: number };
-    gemini: { requests: number; cost: number };
-  };
+  input_tokens: number;
+  output_tokens: number;
+  // Keyed by "Provider/model".
+  model_breakdown: Record<string, ModelBreakdownEntry>;
+  previous: Record<string, number | null>;
+  deltas_pct: Record<string, number | null>;
+}
+
+export interface LogPage {
+  items: LogEntry[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface LogEntry {

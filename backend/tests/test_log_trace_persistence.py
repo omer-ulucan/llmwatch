@@ -59,7 +59,7 @@ async def test_chat_call_is_persisted_with_float_metrics(client, chat_account):
     assert summary["total_requests"] == 1
     assert summary["total_cost_usd"] == pytest.approx(CHAT_COST_USD)
 
-    (log,) = (await client.get("/analytics/logs", headers=acct.headers)).json()
+    (log,) = (await client.get("/analytics/logs", headers=acct.headers)).json()["items"]
     assert isinstance(log["latency_ms"], float)
     assert log["latency_ms"] == pytest.approx(reply["latency_ms"])
     assert log["cost_usd"] == pytest.approx(CHAT_COST_USD)
@@ -77,7 +77,9 @@ async def test_logs_are_isolated_per_workspace(client, chat_account):
     bob = await chat_account(workspace="B")
     await _chat(client, alice)
 
-    assert (await client.get("/analytics/logs", headers=bob.headers)).json() == []
+    assert (await client.get("/analytics/logs", headers=bob.headers)).json()[
+        "items"
+    ] == []
     summary = (await client.get("/analytics/summary", headers=bob.headers)).json()
     assert summary["total_requests"] == 0
 
@@ -88,14 +90,14 @@ async def test_timeseries_reads_persisted_logs(client, chat_account):
     await _chat(client, acct)
 
     series = (await client.get("/analytics/timeseries", headers=acct.headers)).json()
-    assert len(series["timestamps"]) == 2
-    assert series["costs"] == [pytest.approx(CHAT_COST_USD)] * 2
+    assert sum(series["request_counts"]) == 2
+    assert sum(series["costs"]) == pytest.approx(2 * CHAT_COST_USD)
 
 
 async def test_long_previews_are_truncated(client, chat_account):
     acct = await chat_account()
     await _chat(client, acct, prompt="x" * 5000)
-    (log,) = (await client.get("/analytics/logs", headers=acct.headers)).json()
+    (log,) = (await client.get("/analytics/logs", headers=acct.headers)).json()["items"]
     assert len(log["prompt_preview"]) == 200
 
 

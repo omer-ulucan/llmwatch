@@ -34,7 +34,9 @@ async def _chat(client, account, model="fake-model"):
 
 
 async def _logs(client, account):
-    return (await client.get("/analytics/logs", headers=account.headers)).json()
+    return (await client.get("/analytics/logs", headers=account.headers)).json()[
+        "items"
+    ]
 
 
 @pytest.mark.parametrize(
