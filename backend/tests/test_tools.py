@@ -7,8 +7,12 @@ no real DynamoDB calls, no real URL fetches).
 """
 
 import sys
+import threading
 import types
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # ── Ensure duckduckgo_search is importable for patching ────
 # The web_search tool lazily imports DDGS inside its function body.
@@ -213,19 +217,20 @@ class TestDocAnalyzer:
 
     def test_analyze_document_html_extraction(self):
         """Verify analyze_document extracts text from HTML."""
-        from unittest.mock import MagicMock
+        import httpx
 
+        from security.ssrf import FetchResult
         from tools.doc_analyzer import analyze_document
 
         html_content = b"<html><head><title>Test</title></head><body><p>Hello World</p><script>var x=1;</script></body></html>"
+        fetched = FetchResult(
+            url="https://example.com",
+            status_code=200,
+            headers=httpx.Headers({"Content-Type": "text/html; charset=utf-8"}),
+            content=html_content,
+        )
 
-        mock_response = MagicMock()
-        mock_response.headers = {"Content-Type": "text/html; charset=utf-8"}
-        mock_response.read.return_value = html_content
-        mock_response.__enter__ = MagicMock(return_value=mock_response)
-        mock_response.__exit__ = MagicMock(return_value=False)
-
-        with patch("urllib.request.urlopen", return_value=mock_response):
+        with patch("tools.doc_analyzer.safe_fetch", return_value=fetched):
             result = analyze_document.invoke("https://example.com")
 
         assert "Hello World" in result
@@ -234,23 +239,30 @@ class TestDocAnalyzer:
 
     def test_analyze_document_http_error(self):
         """Verify analyze_document handles HTTP errors."""
-        import urllib.error
+        import httpx
 
+        from security.ssrf import FetchResult
         from tools.doc_analyzer import analyze_document
 
-        with patch(
-            "urllib.request.urlopen",
-            side_effect=urllib.error.HTTPError(
-                url="https://example.com",
-                code=404,
-                msg="Not Found",
-                hdrs=None,  # type: ignore[arg-type]
-                fp=None,
-            ),
-        ):
+        fetched = FetchResult(
+            url="https://example.com/missing",
+            status_code=404,
+            headers=httpx.Headers({"Content-Type": "text/html"}),
+            content=b"Not Found",
+        )
+
+        with patch("tools.doc_analyzer.safe_fetch", return_value=fetched):
             result = analyze_document.invoke("https://example.com/missing")
 
         assert "404" in result
+
+    def test_analyze_document_blocked_url_reports_reason(self):
+        """Verify a blocked URL is reported to the model instead of fetched."""
+        from tools.doc_analyzer import analyze_document
+
+        result = analyze_document.invoke("http://169.254.169.254/latest/meta-data/")
+
+        assert result.startswith("Request blocked:")
 
     def test_html_text_extractor_strips_script_and_style(self):
         """Verify the HTML text extractor removes script and style tags."""
@@ -262,3 +274,42 @@ class TestDocAnalyzer:
         assert "Visible" in text
         assert "color: red" not in text
         assert "alert" not in text
+
+
+# ── Tool-level regression tests (real loopback server) ──────
+
+
+class _SecretHandler(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802 - stdlib naming
+        body = b"TOP-SECRET-METADATA"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture
+def loopback_server():
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _SecretHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield server.server_address[1]
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost"])
+def test_doc_analyzer_cannot_read_loopback_services(loopback_server, host, monkeypatch):
+    """Regression: analyze_document used to fetch any URL, including localhost."""
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+        monkeypatch.delenv(var, raising=False)
+    from tools.doc_analyzer import analyze_document
+
+    result = analyze_document.invoke(f"http://{host}:{loopback_server}/")
+
+    assert "TOP-SECRET-METADATA" not in result
+    assert "blocked" in result.lower()

@@ -2,14 +2,18 @@
 Module: doc_analyzer.py
 Purpose: URL fetching and document analysis tool for the LLMWatch agent.
 WHY: Allows the agent to read and summarize web pages or documents at given URLs.
+All fetching goes through security.ssrf.safe_fetch, which blocks internal addresses.
 """
 
+import asyncio
 import re
 from html.parser import HTMLParser
 
+import httpx
 from langchain_core.tools import tool
 
-from config import logger
+from config import logger, settings
+from security.ssrf import BlockedURLError, parse_allowed_hosts, safe_fetch
 
 # Maximum content size to return (in characters)
 MAX_CONTENT_CHARS = 5000
@@ -63,31 +67,26 @@ def analyze_document(url: str) -> str:
     articles, documentation, or any publicly accessible document.
     Returns the extracted text content for analysis."""
     try:
-        import urllib.error
-        import urllib.request
-
-        # WHY: Validate URL format before making the request
         if not url.startswith(("http://", "https://")):
             return f"Invalid URL: {url}. URL must start with http:// or https://"
 
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; LLMWatch Agent/1.0)",
-                "Accept": "text/html,application/xhtml+xml,text/plain",
-            },
+        # WHY: LangChain runs this sync tool in a worker thread with no event loop,
+        # so asyncio.run is safe here. The async agent rewrite calls safe_fetch
+        # directly.
+        result = asyncio.run(
+            safe_fetch(
+                url,
+                allowed_hosts=parse_allowed_hosts(settings.fetch_allowed_hosts),
+                max_bytes=500_000,
+                timeout=REQUEST_TIMEOUT,
+            )
         )
 
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
-            content_type = response.headers.get("Content-Type", "")
-            raw = response.read(500_000)  # Max 500KB read
+        if result.status_code >= 400:
+            return f"HTTP error fetching {url}: {result.status_code}"
 
-            # Try to detect encoding
-            encoding = "utf-8"
-            if "charset=" in content_type:
-                encoding = content_type.split("charset=")[-1].split(";")[0].strip()
-
-            text = raw.decode(encoding, errors="replace")
+        content_type = result.headers.get("content-type", "")
+        text = result.text
 
         # Extract text from HTML if needed
         if "html" in content_type.lower() or text.strip().startswith("<!"):
@@ -103,14 +102,15 @@ def analyze_document(url: str) -> str:
         if not text.strip():
             return f"No readable text content found at {url}"
 
-        return f"Content from {url}:\n\n{text}"
+        return f"Content from {result.url}:\n\n{text}"
 
-    except urllib.error.HTTPError as e:
-        return f"HTTP error fetching {url}: {e.code} {e.reason}"
-    except urllib.error.URLError as e:
-        return f"Failed to reach {url}: {str(e.reason)}"
-    except TimeoutError:
+    except BlockedURLError as e:
+        # WHY: Tell the model plainly so it doesn't keep retrying variants.
+        return f"Request blocked: {e}"
+    except (TimeoutError, httpx.TimeoutException):
         return f"Request timed out after {REQUEST_TIMEOUT} seconds for {url}"
+    except httpx.HTTPError as e:
+        return f"Failed to reach {url}: {e}"
     except Exception as e:
         logger.error(f"Document analysis error: {str(e)}")
         return f"Failed to analyze document at {url}: {str(e)}"

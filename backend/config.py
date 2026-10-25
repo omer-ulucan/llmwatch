@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # WHY: Enables running the app locally or at demos without DynamoDB.
     demo_mode: bool = True
 
+    # Agent URL fetching
+    # WHY: The fetch tool blocks private, loopback and link-local addresses. Hosts
+    # listed here (comma-separated, exact or "*.example.com") may resolve to private
+    # addresses, e.g. an intranet wiki the agent is meant to read.
+    fetch_allowed_hosts: str = ""
+
     # Application Settings
     app_env: Literal["development", "production", "testing"] = "development"
     app_version: str = "0.1.0"
