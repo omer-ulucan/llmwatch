@@ -4,11 +4,6 @@
 
 LLMWatch is a full-stack LLMOps platform for monitoring, orchestrating, and securing Large Language Model deployments. It provides a unified API gateway for multi-model routing, autonomous AI agent orchestration with full execution tracing, real-time cost and latency analytics, and enterprise API key management with per-key usage tracking.
 
-## Live Demo
-
-- **App:** http://3.236.50.182:3000
-- **API:** http://3.236.50.182:3000/api
-
 ## Features
 
 - **Multi-Model LLM Gateway** -- Route requests to multiple models (Gemini 3 Flash, Qwen via vLLM, any OpenAI-compatible endpoint) through a single API. Strategy pattern enables zero-downtime model swaps.
@@ -330,4 +325,4 @@ See [`.env.example`](.env.example) for the full list:
 
 ## License
 
-Private -- All rights reserved.
+[MIT](LICENSE)
