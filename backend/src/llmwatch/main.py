@@ -15,7 +15,7 @@ from slowapi.errors import RateLimitExceeded
 from llmwatch.config import logger, settings
 from llmwatch.db import migrate
 from llmwatch.db.engine import dispose_engine, get_sessionmaker, is_memory_sqlite
-from llmwatch.exceptions import LLMWatchException
+from llmwatch.exceptions import LLMServiceException, LLMWatchException
 from llmwatch.middleware.security import setup_security_middleware
 from llmwatch.providers.service import sync_env_providers_all
 from llmwatch.rate_limit import limiter, rate_limit_exceeded_handler
@@ -106,9 +106,14 @@ async def custom_exception_handler(request: Request, exc: LLMWatchException):
     elif exc.code == "CONFLICT":
         status_code = 409
 
-    return JSONResponse(
-        status_code=status_code, content={"error": exc.message, "code": exc.code}
-    )
+    content = {"error": exc.message, "code": exc.code}
+    headers = {}
+    if isinstance(exc, LLMServiceException):
+        status_code = exc.http_status
+        content["error_type"] = exc.error_type
+        if exc.retry_after_s is not None:
+            headers["Retry-After"] = str(max(1, round(exc.retry_after_s)))
+    return JSONResponse(status_code=status_code, content=content, headers=headers)
 
 
 # WHY: Universal error catcher to prevent uncaught exceptions crashing the Uvicorn worker

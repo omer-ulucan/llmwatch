@@ -19,6 +19,7 @@ from llmwatch.db.repository import WorkspaceRepository
 
 PROMPT_PREVIEW_CHARS = 200
 RESPONSE_PREVIEW_CHARS = 500
+ERROR_MESSAGE_CHARS = 1000
 
 
 class LogRepository(WorkspaceRepository[LLMLog]):
@@ -53,6 +54,8 @@ async def record_llm_call(workspace_id: str, **fields: Any) -> str | None:
     fields["response_preview"] = (fields.get("response_preview") or "")[
         :RESPONSE_PREVIEW_CHARS
     ]
+    if fields.get("error_message"):
+        fields["error_message"] = fields["error_message"][:ERROR_MESSAGE_CHARS]
     try:
         async with get_sessionmaker()() as session:
             log = LogRepository(session, workspace_id).add(LLMLog(**fields))
@@ -136,6 +139,8 @@ def log_to_dict(log: LLMLog) -> dict[str, Any]:
         "cost_usd": log.cost_usd,
         "success": log.success,
         "error_type": log.error_type or "none",
+        "error_message": log.error_message,
+        "status_code": log.status_code,
         "thinking_mode": log.thinking_mode,
     }
 

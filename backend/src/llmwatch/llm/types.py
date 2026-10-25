@@ -80,6 +80,20 @@ ErrorKind = Literal[
     "unknown",
 ]
 
+# How a provider failure is reported to our own API clients.
+HTTP_STATUS_FOR_KIND: dict[str, int] = {
+    "rate_limit": 429,
+    "timeout": 504,
+    "connection": 502,
+    "server": 502,
+    # The provider rejected our credentials: a configuration problem upstream.
+    "auth": 502,
+    "permission": 502,
+    "bad_request": 400,
+    "not_found": 400,
+    "unknown": 502,
+}
+
 RETRYABLE_KINDS: frozenset[str] = frozenset(
     {"rate_limit", "server", "timeout", "connection"}
 )
@@ -112,6 +126,10 @@ class LLMError(Exception):
     @property
     def retryable(self) -> bool:
         return self.kind in RETRYABLE_KINDS
+
+    @property
+    def http_status(self) -> int:
+        return HTTP_STATUS_FOR_KIND.get(self.kind, 502)
 
     @property
     def error_type(self) -> str:
