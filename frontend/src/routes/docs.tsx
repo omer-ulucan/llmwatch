@@ -1445,7 +1445,7 @@ def stream_agent(token: str, prompt: str):
               </thead>
               <tbody>
                 {[
-                  { name: 'JWT_SECRET_KEY', def: '—', req: true, desc: 'Secret key for signing JWTs. Use: openssl rand -hex 32' },
+                  { name: 'JWT_SECRET_KEY', def: '—', req: true, desc: 'Secret key for signing JWTs, at least 32 characters. Use: openssl rand -hex 32' },
                   { name: 'JWT_ALGORITHM', def: 'HS256', req: false, desc: 'JWT signing algorithm' },
                   { name: 'JWT_EXPIRE_HOURS', def: '24', req: false, desc: 'Token expiry in hours' },
                   { name: 'GOOGLE_API_KEY', def: '—', req: true, desc: 'Google Gemini API key' },
