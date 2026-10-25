@@ -1,68 +1,54 @@
 """
 Module: analytics.py
 Purpose: Provides endpoints for reporting cost and performance metrics to the frontend.
-WHY: Delivering rapid analytics depends on targeted GSI queries and aggregation.
+WHY: Reads the LLM call logs stored in the SQL database. The response shapes match
+what the dashboard expects today; real time windows and SQL aggregation follow.
 """
 
-from decimal import Decimal
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from llmwatch.auth.dependencies import get_current_user
-from llmwatch.services.dynamo_service import get_dynamo_service
+from llmwatch.db.engine import get_session
+from llmwatch.services.observability import LogRepository, log_to_dict
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 
-def to_float(value) -> float:
-    """Safely convert DynamoDB Decimal or any numeric type to float."""
-    if isinstance(value, Decimal):
-        return float(value)
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 @router.get("/summary")
-async def get_summary(current_user: Dict[str, Any] = Depends(get_current_user)):
+async def get_summary(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     """
     Computes overarching platform KPIs for a given tenant.
     """
-    company_id = current_user["company_id"]
-    dynamo_service = get_dynamo_service()
+    logs = await LogRepository(session, current_user["workspace_id"]).recent(500)
 
-    # WHY: In a true prod app we'd maintain counters or run Athena.
-    # For hackathon/MVP we aggregate the last N logs in memory.
-    logs = dynamo_service.get_logs(company_id=company_id, limit=500)
+    total_cost = sum(log.cost_usd for log in logs)
+    avg_latency = sum(log.latency_ms for log in logs) / max(len(logs), 1)
+    error_count = sum(1 for log in logs if not log.success)
 
-    total_cost = sum(to_float(log.get("cost_usd", 0)) for log in logs)
-    avg_latency = sum(to_float(log.get("latency_ms", 0)) for log in logs) / max(
-        len(logs), 1
-    )
-    error_count = sum(1 for log in logs if not log.get("success", True))
-
-    qwen_logs = [log for log in logs if log.get("model_name") == "qwen"]
-    gemini_logs = [log for log in logs if log.get("model_name") == "gemini"]
+    qwen_logs = [log for log in logs if log.model_name == "qwen"]
+    gemini_logs = [log for log in logs if log.model_name == "gemini"]
 
     return {
-        "total_cost_usd": round(total_cost, 6),
+        # WHY: Full precision; per-call costs are often below $0.000001 and
+        # rounding here compounds in aggregates. The UI formats for display.
+        "total_cost_usd": total_cost,
         "avg_latency_ms": round(avg_latency, 2),
         "total_requests": len(logs),
         "error_rate_pct": round((error_count / max(len(logs), 1)) * 100, 2),
         "model_breakdown": {
             "qwen": {
                 "requests": len(qwen_logs),
-                "cost": round(
-                    sum(to_float(log.get("cost_usd", 0)) for log in qwen_logs), 6
-                ),
+                "cost": sum(log.cost_usd for log in qwen_logs),
             },
             "gemini": {
                 "requests": len(gemini_logs),
-                "cost": round(
-                    sum(to_float(log.get("cost_usd", 0)) for log in gemini_logs), 6
-                ),
+                "cost": sum(log.cost_usd for log in gemini_logs),
             },
         },
     }
@@ -73,35 +59,26 @@ async def get_logs_list(
     limit: int = 50,
     model: str = "all",
     current_user: Dict[str, Any] = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Provides a paginated view of granular invocation traces.
     """
-    dynamo_service = get_dynamo_service()
-    logs = dynamo_service.get_logs(company_id=current_user["company_id"], limit=limit)
-    if model != "all":
-        logs = [log for log in logs if log.get("model_name") == model]
-
-    # WHY: Convert Decimal values to float for JSON serialization
-    sanitized_logs = []
-    for log in logs:
-        sanitized = {}
-        for k, v in log.items():
-            sanitized[k] = float(v) if isinstance(v, Decimal) else v
-        sanitized_logs.append(sanitized)
-
-    return sanitized_logs
+    repo = LogRepository(session, current_user["workspace_id"])
+    logs = await repo.recent(limit, model_name=None if model == "all" else model)
+    return [log_to_dict(log) for log in logs]
 
 
 @router.get("/timeseries")
 async def get_timeseries(
-    hours: int = 24, current_user: Dict[str, Any] = Depends(get_current_user)
+    hours: int = 24,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Groups metrics into time buckets suitable for charting.
     """
-    dynamo_service = get_dynamo_service()
-    logs = dynamo_service.get_logs(company_id=current_user["company_id"], limit=100)
+    logs = await LogRepository(session, current_user["workspace_id"]).recent(100)
 
     timestamps = []
     costs = []
@@ -110,9 +87,9 @@ async def get_timeseries(
 
     # Iterate and build arrays for Recharts AreaChart
     for log in reversed(logs):  # Ascending order for charts
-        timestamps.append(log.get("timestamp"))
-        costs.append(to_float(log.get("cost_usd", 0)))
-        latencies.append(to_float(log.get("latency_ms", 0)))
+        timestamps.append(log.created_at.isoformat())
+        costs.append(log.cost_usd)
+        latencies.append(log.latency_ms)
         request_counts.append(1)
 
     return {

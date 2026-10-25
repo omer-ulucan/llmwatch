@@ -147,65 +147,96 @@ class TestCodeExecutor:
 
 
 class TestDbQuery:
-    """Tests for the LLM usage log query tool."""
+    """Tests for the LLM usage log query tool (against the SQL database).
 
-    def test_db_query_returns_summary(self):
+    The agent calls tools from a worker thread, so the tests do too
+    (asyncio.to_thread); the tool hands the query back to the event loop.
+    """
+
+    async def _seed(self, make_account, db_session):
+        from llmwatch.db.models import LLMLog
+
+        acct = await make_account()
+        db_session.add_all(
+            [
+                LLMLog(
+                    workspace_id=acct.workspace_id,
+                    model_name="qwen",
+                    cost_usd=0.001,
+                    latency_ms=500.0,
+                    prompt_preview="Hello world",
+                    input_tokens=10,
+                    output_tokens=50,
+                ),
+                LLMLog(
+                    workspace_id=acct.workspace_id,
+                    model_name="gemini",
+                    cost_usd=0.002,
+                    latency_ms=300.0,
+                    prompt_preview="Test prompt",
+                    input_tokens=20,
+                    output_tokens=100,
+                ),
+            ]
+        )
+        await db_session.commit()
+        return acct
+
+    async def test_db_query_returns_summary(self, make_account, db_session):
         """Verify db_query formats logs into a readable summary."""
+        import asyncio
+
         from llmwatch.tools.db_query import make_db_query_tool
 
-        mock_dynamo = MagicMock()
-        mock_dynamo.get_logs.return_value = [
-            {
-                "model_name": "qwen",
-                "cost_usd": 0.001,
-                "latency_ms": 500,
-                "timestamp": "2025-01-01T00:00:00Z",
-                "prompt_preview": "Hello world",
-                "input_tokens": 10,
-                "output_tokens": 50,
-            },
-            {
-                "model_name": "gemini",
-                "cost_usd": 0.002,
-                "latency_ms": 300,
-                "timestamp": "2025-01-01T01:00:00Z",
-                "prompt_preview": "Test prompt",
-                "input_tokens": 20,
-                "output_tokens": 100,
-            },
-        ]
-
-        tool = make_db_query_tool("test-company", dynamo_service=mock_dynamo)
-        result = tool.invoke("show my usage")
+        acct = await self._seed(make_account, db_session)
+        tool = make_db_query_tool(acct.workspace_id)
+        result = await asyncio.to_thread(tool.invoke, "show my usage")
 
         assert "2 requests" in result
         assert "qwen" in result
         assert "gemini" in result
-        assert "$" in result
+        assert "$0.003000" in result
 
-    def test_db_query_no_logs(self):
-        """Verify db_query handles no data gracefully."""
+    async def test_db_query_only_sees_own_workspace(self, make_account, db_session):
+        import asyncio
+
         from llmwatch.tools.db_query import make_db_query_tool
 
-        mock_dynamo = MagicMock()
-        mock_dynamo.get_logs.return_value = []
-
-        tool = make_db_query_tool("test-company", dynamo_service=mock_dynamo)
-        result = tool.invoke("show my usage")
+        await self._seed(make_account, db_session)
+        other = await make_account(workspace="Other")
+        tool = make_db_query_tool(other.workspace_id)
+        result = await asyncio.to_thread(tool.invoke, "show my usage")
 
         assert "No LLM usage logs found" in result
 
-    def test_db_query_handles_exception(self):
-        """Verify db_query returns error message on failure."""
+    async def test_db_query_no_logs(self, make_account):
+        """Verify db_query handles no data gracefully."""
+        import asyncio
+
         from llmwatch.tools.db_query import make_db_query_tool
 
-        mock_dynamo = MagicMock()
-        mock_dynamo.get_logs.side_effect = RuntimeError("DynamoDB error")
+        acct = await make_account()
+        tool = make_db_query_tool(acct.workspace_id)
+        result = await asyncio.to_thread(tool.invoke, "show my usage")
 
-        tool = make_db_query_tool("test-company", dynamo_service=mock_dynamo)
-        result = tool.invoke("show my usage")
+        assert "No LLM usage logs found" in result
 
-        assert "Failed" in result or "error" in result.lower()
+    async def test_db_query_handles_exception(self, make_account, monkeypatch):
+        """Verify db_query returns error message on failure."""
+        import asyncio
+
+        import llmwatch.services.observability as obs
+        from llmwatch.tools.db_query import make_db_query_tool
+
+        async def boom(*args, **kwargs):
+            raise RuntimeError("database unavailable")
+
+        monkeypatch.setattr(obs, "recent_logs_for", boom)
+        acct = await make_account()
+        tool = make_db_query_tool(acct.workspace_id)
+        result = await asyncio.to_thread(tool.invoke, "show my usage")
+
+        assert "Failed" in result
 
 
 # ── doc_analyzer ───────────────────────────────────────────
