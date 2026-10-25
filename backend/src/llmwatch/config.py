@@ -52,8 +52,11 @@ class Settings(BaseSettings):
 
     # LLM Models Settings
     google_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    gemini_model: str = "gemini-3-flash-preview"
     qwen_base_url: str = ""
     qwen_api_key: str = ""
+    qwen_model: str = "qwen3.5-35b-a3b"
 
     # MLFlow Settings
     # Optional: also log every LLM call to an MLflow tracking server (needs the

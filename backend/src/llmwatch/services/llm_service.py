@@ -1,241 +1,140 @@
 """
 Module: llm_service.py
-Purpose: Provides a unified interface for disparate LLM providers using the Strategy pattern.
-WHY: Abstracting model specifics allows the chat router to be completely agnostic to whether
-we're hitting OpenAI, Gemini, or a self-hosted vLLM endpoint.
+Purpose: Chat completions for the legacy "qwen" / "gemini" model aliases.
+WHY: The chat endpoint still accepts the two original aliases. Both now go through the
+provider-neutral OpenAI-compatible client (llmwatch.llm), so token counts are the
+ones the provider reports and reasoning text is real or absent, never invented.
+The provider/model registry replaces these env-configured aliases next.
 """
 
-import re
-import time
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict
 
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
-
-from llmwatch.config import settings
+from llmwatch.config import logger, settings
 from llmwatch.exceptions import LLMServiceException
+from llmwatch.llm import LLMClient, LLMError, ProviderConfig, Usage, compute_cost
+
+# USD per 1M tokens (input, output) for the legacy aliases.
+LEGACY_PRICES: dict[str, tuple[float, float]] = {
+    # Self-hosted: $0.0001 per 1K tokens, input and output alike.
+    "qwen": (0.10, 0.10),
+    "gemini": (0.50, 3.00),
+}
 
 
-class LLMStrategy:
-    """Base strategy interface for LLM execution."""
-
-    async def generate(
-        self, prompt: str, thinking_mode: bool
-    ) -> Tuple[str, Optional[str], float, int, int]:
-        """
-        Executes generation and returns metrics.
-
-        Returns:
-            Tuple[response_text, thinking_content, latency_ms, input_tokens, output_tokens]
-        """
-        raise NotImplementedError
+@dataclass
+class LegacyRoute:
+    alias: str
+    client: LLMClient
+    model_id: str
+    preset: str
 
 
-class QwenStrategy(LLMStrategy):
-    """Strategy for self-hosted Qwen3.5-35B-A3B via vLLM's OpenAI compatible API."""
-
-    def __init__(self):
-        # WHY: vLLM exposes an OpenAI-compatible API, allowing us to use standard OpenAI clients
-        # openai_api_key is kept optional at config level. Some self-hosted/proxied
-        # vLLM deployments (e.g. private network, gateway-authenticated) don't require
-        # per-request API keys, but the OpenAI client still expects a non-empty value.
-        self.client = ChatOpenAI(
-            openai_api_base=settings.qwen_base_url,
-            openai_api_key=settings.qwen_api_key or "not-needed",
-            model_name="qwen3.5-35b-a3b",  # Using placeholder name based on prompt
-        )
-
-    async def generate(
-        self, prompt: str, thinking_mode: bool
-    ) -> Tuple[str, Optional[str], float, int, int]:
-        messages = []
-        if not thinking_mode:
-            # WHY: Prompt engineering to force model behavior when thinking is disabled
-            messages.append(SystemMessage(content="/no_think"))
-
-        messages.append(HumanMessage(content=prompt))
-
-        start_time = time.perf_counter()
-        try:
-            response = await self.client.ainvoke(messages)
-            # WHY: Calculate latency immediately surrounding the network request using perf_counter.
-            latency_ms = (time.perf_counter() - start_time) * 1000
-
-            raw_content = response.content
-            thinking_content = None
-
-            # WHY: We strip <think> tags here because vLLM returns Qwen's internal
-            # reasoning wrapped in these tags — end users should never see raw
-            # model internals unless thinking mode is explicitly enabled.
-            if "<think>" in raw_content and "</think>" in raw_content:
-                think_match = re.search(
-                    r"<think>(.*?)</think>", raw_content, flags=re.DOTALL
-                )
-                if think_match:
-                    thinking_content = think_match.group(1).strip()
-                final_response = re.sub(
-                    r"<think>.*?</think>", "", raw_content, flags=re.DOTALL
-                ).strip()
-            else:
-                final_response = raw_content
-
-            input_tokens = response.response_metadata.get("token_usage", {}).get(
-                "prompt_tokens", 0
-            )
-            output_tokens = response.response_metadata.get("token_usage", {}).get(
-                "completion_tokens", 0
-            )
-
-            return (
-                final_response,
-                thinking_content if thinking_mode else None,
-                latency_ms,
-                input_tokens,
-                output_tokens,
-            )
-        except Exception as e:
-            raise LLMServiceException(
-                f"Qwen generation failed: {str(e)}", provider="qwen"
-            )
+def _thinking_params(preset: str, thinking_mode: bool) -> dict[str, Any]:
+    """Provider-specific knobs for reasoning on/off."""
+    if preset == "gemini":
+        # Gemini's OpenAI-compatible endpoint maps reasoning_effort onto its
+        # thinking levels.
+        return {"reasoning_effort": "high" if thinking_mode else "low"}
+    return {}
 
 
-class GeminiStrategy(LLMStrategy):
-    """Strategy for Gemini 3 Flash Preview via Google API."""
-
-    def __init__(self):
-        self.client = ChatGoogleGenerativeAI(
-            model="gemini-3-flash-preview", google_api_key=settings.google_api_key
-        )
-
-    async def generate(
-        self, prompt: str, thinking_mode: bool
-    ) -> Tuple[str, Optional[str], float, int, int]:
-        messages = [HumanMessage(content=prompt)]
-
-        start_time = time.perf_counter()
-        try:
-            # WHY: Gemini handles thinking natively via parameters rather than system prompts
-            response = await self.client.ainvoke(
-                messages,
-                # Note: mapped parameters per design doc
-                thinking_level="high" if thinking_mode else "minimal",
-            )
-            latency_ms = (time.perf_counter() - start_time) * 1000
-
-            # Extract basic metric stubs — Langchain's Google metrics formats vary
-            input_tokens = (
-                getattr(response, "response_metadata", {})
-                .get("prompt_feedback", {})
-                .get("token_count", len(prompt) // 4)
-            )
-            output_tokens = (
-                getattr(response, "response_metadata", {})
-                .get("candidates", [{}])[0]
-                .get("token_count", len(response.content) // 4)
-            )
-
-            final_response = response.content
-            thinking_content = (
-                "Thinking logic computed upstream via Google API."
-                if thinking_mode
-                else None
-            )
-
-            return (
-                final_response,
-                thinking_content,
-                latency_ms,
-                input_tokens,
-                output_tokens,
-            )
-        except Exception as e:
-            raise LLMServiceException(
-                f"Gemini generation failed: {str(e)}", provider="gemini"
-            )
+def _messages(preset: str, prompt: str, thinking_mode: bool) -> list[dict[str, str]]:
+    messages = []
+    if preset == "vllm" and not thinking_mode:
+        # WHY: Qwen3-style models honour this soft switch to skip reasoning.
+        messages.append({"role": "system", "content": "/no_think"})
+    messages.append({"role": "user", "content": prompt})
+    return messages
 
 
 class LLMService:
-    """Orchestrator for managing LLM interactions."""
+    """Routes legacy aliases to configured providers."""
 
     def __init__(self):
-        self.strategies: Dict[str, LLMStrategy] = {}
+        self.routes: Dict[str, LegacyRoute] = {}
         # WHY: Only register providers that are configured, so the server starts
         # without any LLM credentials (zero-config install).
         if settings.google_api_key:
-            self.strategies["gemini"] = GeminiStrategy()
-        # Register Qwen whenever a base URL is configured.
+            self.routes["gemini"] = LegacyRoute(
+                alias="gemini",
+                client=LLMClient(
+                    ProviderConfig(
+                        name="gemini",
+                        base_url=settings.gemini_base_url,
+                        api_key=settings.google_api_key,
+                        preset="gemini",
+                    )
+                ),
+                model_id=settings.gemini_model,
+                preset="gemini",
+            )
         # API key is optional for self-hosted or gateway-authenticated deployments.
         if settings.qwen_base_url:
-            try:
-                self.strategies["qwen"] = QwenStrategy()
-            except Exception as e:
-                import logging
-
-                logging.getLogger(__name__).warning(f"Qwen strategy unavailable: {e}")
+            self.routes["qwen"] = LegacyRoute(
+                alias="qwen",
+                client=LLMClient(
+                    ProviderConfig(
+                        name="qwen",
+                        base_url=settings.qwen_base_url,
+                        api_key=settings.qwen_api_key or None,
+                        preset="vllm",
+                    )
+                ),
+                model_id=settings.qwen_model,
+                preset="vllm",
+            )
+        logger.debug(f"LLM aliases configured: {sorted(self.routes)}")
 
     def calculate_cost(
         self, model: str, input_tokens: int, output_tokens: int
     ) -> float:
         """
-        Computes cost in USD per model pricing.
-
-        Args:
-            model (str): The provider alias.
-            input_tokens (int): Prompt token size.
-            output_tokens (int): Completion token size.
-
-        Returns:
-            float: Decimal USD value tracking the cost.
+        Computes cost in USD for a legacy alias (0.0 for unknown aliases).
         """
-        # WHY: Extract cost_estimation to standalone utility function for easier testing and logic reuse
-        if model == "qwen":
-            # $0.0001 per 1k tokens combined
-            return ((input_tokens + output_tokens) / 1000) * 0.0001
-        elif model == "gemini":
-            # $0.50 / 1M input, $3.00 / 1M output
-            return (input_tokens / 1_000_000) * 0.50 + (
-                output_tokens / 1_000_000
-            ) * 3.00
-        return 0.0
+        prices = LEGACY_PRICES.get(model)
+        if prices is None:
+            return 0.0
+        usage = Usage(input_tokens=input_tokens, output_tokens=output_tokens)
+        return compute_cost(usage, *prices) or 0.0
 
     async def execute_chat(
         self, prompt: str, model: str, thinking_mode: bool
     ) -> Dict[str, Any]:
         """
-        Runs the generation via the mapped strategy and calculates cost.
-
-        Args:
-            prompt (str): Text payload to send for completion.
-            model (str): Identifier defining which provider config to select.
-            thinking_mode (bool): Flag toggling enhanced reasoning output.
-
-        Returns:
-            Dict[str, Any]: Consolidated metrics and textual outputs payload dict.
+        Runs one completion for a legacy alias and calculates cost.
 
         Raises:
-            LLMServiceException: For unregistered model IDs or execution failures.
+            LLMServiceException: For unconfigured aliases or provider failures
+                (the normalised LLMError is attached as `.llm_error`).
         """
-        if model not in self.strategies:
+        route = self.routes.get(model)
+        if route is None:
             raise LLMServiceException(f"Unsupported model: {model}", provider="system")
 
-        strategy = self.strategies[model]
-        (
-            response_text,
-            thinking,
-            latency,
-            in_tokens,
-            out_tokens,
-        ) = await strategy.generate(prompt, thinking_mode)
-        cost_usd = self.calculate_cost(model, in_tokens, out_tokens)
+        try:
+            result = await route.client.chat(
+                route.model_id,
+                _messages(route.preset, prompt, thinking_mode),
+                **_thinking_params(route.preset, thinking_mode),
+            )
+        except LLMError as err:
+            exc = LLMServiceException(
+                f"{model} generation failed: {err.message}", provider=model
+            )
+            exc.llm_error = err  # type: ignore[attr-defined]
+            raise exc from err
 
         return {
-            "response": response_text,
-            "thinking_content": thinking,
-            "latency_ms": latency,
-            "input_tokens": in_tokens,
-            "output_tokens": out_tokens,
-            "cost_usd": cost_usd,
+            "response": result.content,
+            # WHY: Only what the provider actually returned; None otherwise.
+            "thinking_content": result.reasoning if thinking_mode else None,
+            "latency_ms": result.latency_ms,
+            "input_tokens": result.usage.input_tokens,
+            "output_tokens": result.usage.output_tokens,
+            "cost_usd": self.calculate_cost(
+                model, result.usage.input_tokens, result.usage.output_tokens
+            ),
             "model_used": model,
             "thinking_mode": thinking_mode,
         }

@@ -100,25 +100,17 @@ class TestAgentServiceGetLLM:
         """Verify _get_langchain_llm returns the strategy's client for valid models."""
         from llmwatch.services.agent_service import AgentService
 
-        mock_llm_service = MagicMock()
         mock_client = MagicMock()
-        mock_strategy = MagicMock()
-        mock_strategy.client = mock_client
-        mock_llm_service.strategies = {"gemini": mock_strategy}
-
-        service = AgentService(mock_llm_service)
+        service = AgentService({"gemini": mock_client}.__getitem__)
         result = service._get_langchain_llm("gemini")
 
         assert result is mock_client
 
     def test_get_langchain_llm_invalid_model(self):
         """Verify _get_langchain_llm raises ValueError for unknown models."""
-        from llmwatch.services.agent_service import AgentService
+        from llmwatch.services.agent_service import AgentService, _default_langchain_llm
 
-        mock_llm_service = MagicMock()
-        mock_llm_service.strategies = {}
-
-        service = AgentService(mock_llm_service)
+        service = AgentService(_default_langchain_llm)
 
         with pytest.raises(ValueError, match="Unsupported model"):
             service._get_langchain_llm("gpt-4")
@@ -136,13 +128,7 @@ class TestAgentServiceRunAgent:
         """Verify run_agent yields a run_start event as its first event."""
         from llmwatch.services.agent_service import AgentService
 
-        mock_llm_service = MagicMock()
-        mock_client = MagicMock()
-        mock_strategy = MagicMock()
-        mock_strategy.client = mock_client
-        mock_llm_service.strategies = {"gemini": mock_strategy}
-
-        service = AgentService(mock_llm_service)
+        service = AgentService(lambda model: MagicMock())
 
         # Mock create_react_agent and AgentExecutor to avoid needing real LLM
         with (
@@ -181,12 +167,7 @@ class TestAgentServiceRunAgent:
 
         from llmwatch.services.agent_service import AgentService
 
-        mock_llm_service = MagicMock()
-        mock_strategy = MagicMock()
-        mock_strategy.client = MagicMock()
-        mock_llm_service.strategies = {"qwen": mock_strategy}
-
-        service = AgentService(mock_llm_service)
+        service = AgentService(lambda model: MagicMock())
 
         with (
             patch("llmwatch.services.agent_service.create_react_agent"),
