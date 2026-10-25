@@ -5,14 +5,16 @@ WHY: Chat interactions represent the core value proposition of the system.
 By injecting the JWT token dependencies we secure this route by default.
 """
 
-from fastapi import APIRouter, Depends, Request, BackgroundTasks
-from typing import Dict, Any
-from models.schemas import ChatCompletionRequest, ChatCompletionResponse
+from typing import Any, Dict
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+
 from auth.dependencies import get_current_user
+from config import logger
+from models.schemas import ChatCompletionRequest, ChatCompletionResponse
+from services.dynamo_service import get_dynamo_service
 from services.llm_service import get_llm_service
 from services.mlflow_service import get_mlflow_service
-from services.dynamo_service import get_dynamo_service
-from config import logger
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 

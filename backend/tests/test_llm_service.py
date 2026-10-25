@@ -6,12 +6,12 @@ NOTE: We do NOT instantiate real LLM strategies (they require network).
       strategy.generate for execute_chat.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.llm_service import LLMService, LLMStrategy
-from exceptions import LLMServiceException
+import pytest
 
+from exceptions import LLMServiceException
+from services.llm_service import LLMService, LLMStrategy
 
 # ── Cost calculation ─────────────────────────────────────────────────────
 

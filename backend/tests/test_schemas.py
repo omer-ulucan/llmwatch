@@ -4,14 +4,14 @@ Tests for Pydantic v2 request/response schemas in models/schemas.py.
 
 import pytest
 from pydantic import ValidationError
+
 from models.schemas import (
-    RegisterRequest,
-    LoginRequest,
-    TokenResponse,
     ChatCompletionRequest,
     ChatCompletionResponse,
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
 )
-
 
 # ── RegisterRequest ──────────────────────────────────────────────────────
 

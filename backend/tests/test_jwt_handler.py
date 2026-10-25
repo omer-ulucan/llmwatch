@@ -2,19 +2,18 @@
 Tests for JWT token generation, decoding, and password hashing.
 """
 
-import pytest
 from datetime import timedelta
 from unittest.mock import patch
-from jose import jwt as jose_jwt
+
+import pytest
 
 from auth.jwt_handler import (
     create_access_token,
     decode_access_token,
-    verify_password,
     get_password_hash,
+    verify_password,
 )
 from exceptions import AuthenticationException
-
 
 # ── Password hashing ─────────────────────────────────────────────────────
 

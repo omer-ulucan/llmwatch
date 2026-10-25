@@ -5,9 +5,10 @@ WHY: This ensures the application crashes immediately on startup if required con
 rather than failing unexpectedly at runtime.
 """
 
-from typing import List, Literal
-from pydantic_settings import BaseSettings, SettingsConfigDict
 import logging
+from typing import List, Literal
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):

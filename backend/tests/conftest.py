@@ -8,6 +8,7 @@ before any application module is loaded.
 
 import os
 import sys
+
 import pytest
 
 # ---------------------------------------------------------------------------

@@ -7,14 +7,16 @@ Supports two auth methods:
   2. X-API-Key header (for programmatic/SDK access)
 """
 
-import hashlib
 import asyncio
+import hashlib
+from typing import Any, Dict, Optional
+
 from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
-from typing import Dict, Any, Optional
+
 from auth.jwt_handler import decode_access_token
-from exceptions import AuthenticationException
 from config import logger
+from exceptions import AuthenticationException
 
 # WHY: OAuth2PasswordBearer automatically looks for the Authorization: Bearer <token> header
 # and integrates directly with FastAPI's OpenAPI swagger documentation standard.

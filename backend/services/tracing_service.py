@@ -6,16 +6,16 @@ tool results, final answers) as structured events. These events serve double dut
 frontend via SSE in real-time AND persisted to DynamoDB for the trace viewer.
 """
 
-import time
 import asyncio
+import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Literal, Union
+from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
-from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.agents import AgentAction, AgentFinish
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
+from pydantic import BaseModel
 
 from config import logger
 

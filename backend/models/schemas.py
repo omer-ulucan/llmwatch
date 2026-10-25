@@ -4,8 +4,9 @@ Purpose: Pydantic v2 schemas for request and response validation.
 WHY: Strict typing and explicit forbid of extra fields stops injection vulnerabilities at the API boundary.
 """
 
-from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
 from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class RegisterRequest(BaseModel):

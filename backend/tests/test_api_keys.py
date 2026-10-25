@@ -6,20 +6,20 @@ Tests for the API key management feature:
 - Key generation and hashing utilities
 """
 
-import pytest
 import hashlib
-from unittest.mock import patch, MagicMock
-from pydantic import ValidationError
-from botocore.exceptions import ClientError
+from unittest.mock import MagicMock, patch
 
+import pytest
+from botocore.exceptions import ClientError
+from pydantic import ValidationError
+
+from exceptions import DatabaseException
 from models.schemas import (
+    ApiKeyListResponse,
+    ApiKeyResponse,
     CreateApiKeyRequest,
     CreateApiKeyResponse,
-    ApiKeyResponse,
-    ApiKeyListResponse,
 )
-from exceptions import DatabaseException, ResourceNotFoundException
-
 
 # ── Schema Validation Tests ───────────────────────────────────────────────
 
@@ -297,8 +297,9 @@ class TestApiKeysRouter:
     def _get_test_client(self):
         """Create a TestClient with mocked dependencies."""
         from fastapi.testclient import TestClient
-        from main import app
+
         from auth.dependencies import get_current_user
+        from main import app
 
         async def mock_user():
             return {"user_id": "test-user", "company_id": "test-company"}

@@ -8,7 +8,7 @@ SSE streaming for real-time step-by-step observation.
 
 import json
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -16,9 +16,9 @@ from fastapi.responses import StreamingResponse
 from auth.dependencies import get_current_user
 from config import logger
 from models.schemas import AgentRunRequest
-from services.agent_service import AgentService, get_agent_service
-from services.dynamo_service import DynamoDBService, get_dynamo_service
-from services.mlflow_service import MLFlowService, get_mlflow_service
+from services.agent_service import get_agent_service
+from services.dynamo_service import get_dynamo_service
+from services.mlflow_service import get_mlflow_service
 
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
@@ -62,7 +62,6 @@ async def run_agent(
         chunk to the client as it's yielded — enabling real-time streaming.
         """
         trace_data = None
-        last_event = None
 
         async for event in agent_svc.run_agent(
             prompt=data.prompt,
@@ -74,7 +73,6 @@ async def run_agent(
             # Format as SSE: "data: {json}\n\n"
             event_json = event.model_dump_json()
             yield f"data: {event_json}\n\n"
-            last_event = event
 
             # If this is the run_end event, extract trace data for background saving
             if event.event_type == "run_end":

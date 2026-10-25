@@ -5,9 +5,11 @@ WHY: Custom stateless token management avoids database hits for 99% of requests,
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional
-from jose import JWTError, jwt
+from typing import Any, Dict, Optional
+
 import bcrypt
+from jose import JWTError, jwt
+
 from config import settings
 from exceptions import AuthenticationException
 

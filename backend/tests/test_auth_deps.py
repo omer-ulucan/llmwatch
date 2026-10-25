@@ -3,8 +3,9 @@ Tests for the auth dependency (get_current_user) in auth/dependencies.py.
 WHY: Covers both JWT and API key authentication paths.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 
 from auth.dependencies import get_current_user
 from auth.jwt_handler import create_access_token

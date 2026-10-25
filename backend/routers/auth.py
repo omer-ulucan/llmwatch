@@ -4,21 +4,23 @@ Purpose: Exposes authentication API routes.
 WHY: Encapsulating login/registration endpoints isolates public-facing handlers from protected routes.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.security import OAuth2PasswordRequestForm
-from models.schemas import (
-    RegisterRequest,
-    LoginRequest,
-    TokenResponse,
-    RegisterResponse,
-)
-from auth.jwt_handler import get_password_hash, verify_password, create_access_token
-from services.dynamo_service import get_dynamo_service
-from exceptions import AuthenticationException, ValidationException
-from config import settings
-from rate_limit import limiter
 import uuid
 from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.security import OAuth2PasswordRequestForm
+
+from auth.jwt_handler import create_access_token, get_password_hash, verify_password
+from config import settings
+from exceptions import AuthenticationException, ValidationException
+from models.schemas import (
+    LoginRequest,
+    RegisterRequest,
+    RegisterResponse,
+    TokenResponse,
+)
+from rate_limit import limiter
+from services.dynamo_service import get_dynamo_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

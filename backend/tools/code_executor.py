@@ -6,10 +6,12 @@ WHY: Allows the agent to run Python code for data analysis, math, etc.
 WARNING: For production use, this should be replaced with Docker container isolation.
 """
 
+import os
 import subprocess
 import tempfile
-import os
+
 from langchain_core.tools import tool
+
 from config import logger
 
 # Maximum output size in bytes

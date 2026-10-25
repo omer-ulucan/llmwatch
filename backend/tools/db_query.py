@@ -6,7 +6,9 @@ own LLM usage patterns, costs, and performance.
 """
 
 from typing import Any, Dict, List
+
 from langchain_core.tools import tool
+
 from config import logger
 
 
@@ -54,7 +56,7 @@ Model Breakdown:
             f"  {model}: {count} requests, ${model_costs[model]:.6f} total cost\n"
         )
 
-    summary += f"\nRecent Logs (newest first):\n"
+    summary += "\nRecent Logs (newest first):\n"
     # Show at most 20 individual log entries to keep context manageable
     for line in lines[:20]:
         summary += line + "\n"
