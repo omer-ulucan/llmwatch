@@ -98,7 +98,13 @@ class TestWebSearch:
 
 
 class TestCodeExecutor:
-    """Tests for the sandboxed Python code execution tool."""
+    """Tests for the opt-in Python code execution tool (run with it enabled)."""
+
+    @pytest.fixture(autouse=True)
+    def _enable_code_execution(self, monkeypatch):
+        from config import settings
+
+        monkeypatch.setattr(settings, "enable_code_execution", True)
 
     def test_execute_python_simple(self):
         """Verify execute_python runs simple code and returns output."""

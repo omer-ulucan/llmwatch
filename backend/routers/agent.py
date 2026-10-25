@@ -19,6 +19,7 @@ from models.schemas import AgentRunRequest
 from services.agent_service import get_agent_service
 from services.dynamo_service import get_dynamo_service
 from services.mlflow_service import get_mlflow_service
+from tools.registry import available_tools
 
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
@@ -139,6 +140,17 @@ async def run_agent(
             "X-Accel-Buffering": "no",  # Disable nginx buffering for SSE
         },
     )
+
+
+@router.get("/tools")
+async def list_tools(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Returns the agent tools this server allows.
+    WHY: Some tools are opt-in (code execution), so the UI asks instead of assuming.
+    """
+    return {"tools": available_tools()}
 
 
 @router.get("/traces")

@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # WHY: Enables running the app locally or at demos without DynamoDB.
     demo_mode: bool = True
 
+    # Agent Python code execution
+    # WHY: The python tool runs model-written code as a subprocess of the backend. It
+    # is NOT a sandbox: it shares the container's filesystem and network. Keep it off
+    # unless the deployment is isolated and you accept that risk.
+    enable_code_execution: bool = False
+
     # Agent URL fetching
     # WHY: The fetch tool blocks private, loopback and link-local addresses. Hosts
     # listed here (comma-separated, exact or "*.example.com") may resolve to private
