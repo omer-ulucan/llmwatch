@@ -8,8 +8,15 @@ rather than failing unexpectedly at runtime.
 import logging
 from typing import List, Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MIN_SECRET_LENGTH = 32
+# Placeholders shipped in .env.example and the docs: long enough, but public.
+_PLACEHOLDER_SECRETS = {
+    "replace_with_32_char_minimum_random_string",
+    "your-secret-key-generated-with-openssl-rand-hex-32",
+}
 
 
 class Settings(BaseSettings):
@@ -63,6 +70,23 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def _require_strong_jwt_secret(cls, v: str) -> str:
+        # WHY: Short HS256 secrets can be brute-forced offline from one captured
+        # token, letting an attacker mint tokens for any tenant.
+        if len(v) < MIN_SECRET_LENGTH:
+            raise ValueError(
+                f"JWT_SECRET_KEY must be at least {MIN_SECRET_LENGTH} characters; "
+                "generate one with: openssl rand -hex 32"
+            )
+        if v in _PLACEHOLDER_SECRETS:
+            raise ValueError(
+                "JWT_SECRET_KEY is still the .env.example placeholder; "
+                "generate one with: openssl rand -hex 32"
+            )
+        return v
 
     @model_validator(mode="after")
     def _refuse_demo_in_production(self) -> "Settings":
