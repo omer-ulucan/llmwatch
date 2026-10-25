@@ -25,6 +25,11 @@ from routers import agent, analytics, api_keys, auth, chat
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown events."""
     app.state.start_time = time.time()
+    if settings.demo_mode:
+        logger.warning(
+            "DEMO_MODE is enabled: anyone can log in with the public demo "
+            "credentials. Never expose this instance to the internet."
+        )
     logger.info(
         f"LLMWatch {settings.app_version} startup complete in environment: {settings.app_env}"
     )
