@@ -8,6 +8,8 @@ to enable multi-step tool-augmented reasoning.
 
 import asyncio
 import uuid
+from collections.abc import Callable
+from functools import lru_cache
 from typing import Any, AsyncGenerator, List
 
 # WHY: langchain.agents.AgentExecutor and create_react_agent may fail to import on
@@ -26,8 +28,7 @@ except ImportError:
 from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import BaseTool
 
-from llmwatch.config import logger
-from llmwatch.services.llm_service import LLMService, get_llm_service
+from llmwatch.config import logger, settings
 from llmwatch.services.tracing_service import AgentEvent, TracingCallbackHandler
 from llmwatch.tools.code_executor import execute_python
 from llmwatch.tools.db_query import make_db_query_tool
@@ -88,6 +89,26 @@ def build_tools(company_id: str, enabled_tools: List[str]) -> List[BaseTool]:
     return [factories[t]() for t in enabled_tools if t in factories and t in allowed]
 
 
+@lru_cache(maxsize=4)
+def _default_langchain_llm(model: str) -> Any:
+    """Builds the LangChain model for a legacy alias from settings."""
+    if model == "gemini" and settings.google_api_key:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(
+            model=settings.gemini_model, google_api_key=settings.google_api_key
+        )
+    if model == "qwen" and settings.qwen_base_url:
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(
+            openai_api_base=settings.qwen_base_url,
+            openai_api_key=settings.qwen_api_key or "not-needed",
+            model_name=settings.qwen_model,
+        )
+    raise ValueError(f"Unsupported model for agent: {model}")
+
+
 class AgentService:
     """
     Manages ReAct agent execution with real-time tracing via callback handlers.
@@ -97,22 +118,17 @@ class AgentService:
     and event streaming — the router just wires it to the HTTP endpoint.
     """
 
-    def __init__(self, llm_service: LLMService):
-        self.llm_service = llm_service
+    def __init__(self, llm_factory: Callable[[str], Any] | None = None):
+        self._llm_factory = llm_factory or _default_langchain_llm
 
     def _get_langchain_llm(self, model: str) -> Any:
         """
-        Extract the underlying LangChain LLM client from the existing strategy.
+        The LangChain chat model the ReAct agent runs on.
 
-        WHY: The LLMService uses a Strategy pattern with QwenStrategy and GeminiStrategy.
-        Each strategy holds a LangChain ChatModel instance (.client). We reuse these
-        directly with AgentExecutor instead of creating new instances, ensuring consistent
-        configuration (API keys, base URLs, model names).
+        WHY: Chat moved to the OpenAI-compatible client; the agent keeps its own
+        LangChain models until it becomes a native tool-calling loop.
         """
-        strategy = self.llm_service.strategies.get(model)
-        if not strategy:
-            raise ValueError(f"Unsupported model for agent: {model}")
-        return strategy.client
+        return self._llm_factory(model)
 
     async def run_agent(
         self,
@@ -240,7 +256,7 @@ class AgentService:
 
 # ── Singleton + Factory ────────────────────────────────────
 
-agent_service = AgentService(get_llm_service())
+agent_service = AgentService()
 
 
 def get_agent_service() -> AgentService:
