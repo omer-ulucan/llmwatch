@@ -1,0 +1,29 @@
+# Secrets: never bake local env files into the image
+.env
+.env.*
+**/.env
+**/.env.*
+
+# VCS and local tooling
+.git
+.gitignore
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Local data (SQLite databases, generated secrets) and logs
+data
+*.db
+*.db-*
+*.log
+mlflow-artifacts
+mlruns
+
+# Tests are not needed at runtime
+tests

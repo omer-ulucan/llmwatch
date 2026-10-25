@@ -1,0 +1,15 @@
+# Secrets: never bake local env files into the image or the JS bundle
+.env
+.env.*
+**/.env
+**/.env.*
+
+# VCS and local tooling
+.git
+.gitignore
+
+# Installed and built locally; the image installs and builds its own
+node_modules
+dist
+*.tsbuildinfo
+*.log
