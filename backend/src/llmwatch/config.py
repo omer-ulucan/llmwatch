@@ -140,9 +140,12 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# WHY: We configure logging here so it's standardized across all modules using config
+# WHY: Logging is configured here so it's standardized across all modules. Only our
+# own logger goes to DEBUG in development; libraries (aiosqlite, httpx, ...) stay at
+# WARNING, otherwise every SQL round trip is logged.
 logging.basicConfig(
-    level=logging.DEBUG if settings.app_env == "development" else logging.WARNING,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("llmwatch")
+logger.setLevel(logging.DEBUG if settings.app_env == "development" else logging.INFO)
