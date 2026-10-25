@@ -16,17 +16,19 @@ interface ToolOption {
 
 const TOOLS: ToolOption[] = [
   { id: 'web_search', name: 'Web Search', description: 'Search the web via DuckDuckGo', icon: <Search size={16} /> },
-  { id: 'code_execute', name: 'Code Execute', description: 'Run Python code in sandbox', icon: <Code size={16} /> },
+  { id: 'code_execute', name: 'Code Execute', description: 'Run Python code (opt-in on the server)', icon: <Code size={16} /> },
   { id: 'db_query', name: 'DB Query', description: 'Query your LLM usage logs', icon: <Database size={16} /> },
   { id: 'doc_analyze', name: 'Doc Analyze', description: 'Fetch & analyze a URL', icon: <FileText size={16} /> },
 ];
 
 interface AgentToolConfigProps {
+  /** Tool ids the server allows; tools not listed are hidden. */
+  availableTools: string[];
   selectedTools: string[];
   onChange: (tools: string[]) => void;
 }
 
-const AgentToolConfig: React.FC<AgentToolConfigProps> = ({ selectedTools, onChange }) => {
+const AgentToolConfig: React.FC<AgentToolConfigProps> = ({ availableTools, selectedTools, onChange }) => {
   const toggle = (toolId: string) => {
     if (selectedTools.includes(toolId)) {
       onChange(selectedTools.filter(t => t !== toolId));
@@ -40,7 +42,7 @@ const AgentToolConfig: React.FC<AgentToolConfigProps> = ({ selectedTools, onChan
       <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         Agent Tools
       </h4>
-      {TOOLS.map((tool) => {
+      {TOOLS.filter((tool) => availableTools.includes(tool.id)).map((tool) => {
         const isActive = selectedTools.includes(tool.id);
         return (
           <button

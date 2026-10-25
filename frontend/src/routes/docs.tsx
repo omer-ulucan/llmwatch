@@ -1057,12 +1057,14 @@ data: {"run_id":"abc-123","step_index":7,"event_type":"run_end","content":"{\\"r
                 <span className="text-sm text-muted-foreground">Python Code Executor</span>
               </div>
               <p className="text-sm text-muted-foreground mb-2">
-                Executes Python code in a sandboxed subprocess with a 15-second timeout
-                and stripped environment variables. Code should use <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">print()</code> for output.
+                Disabled by default; the server operator enables it with <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">ENABLE_CODE_EXECUTION=true</code>.
+                Runs Python in a child process of the backend with an empty environment, a throwaway
+                working directory and resource limits. It is not a sandbox: the code shares the
+                backend's filesystem and network. Code should use <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">print()</code> for output.
               </p>
               <div className="text-xs text-muted-foreground/60">
                 <strong>Input:</strong> <code className="font-mono">code</code> (string) — Python code to execute.<br />
-                <strong>Limits:</strong> 15s timeout, 10KB max output, sandboxed environment.
+                <strong>Limits:</strong> 15s timeout (wall clock and CPU), 512 MB memory, 10KB max output.
               </div>
             </div>
 
