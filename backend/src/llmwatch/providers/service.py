@@ -346,6 +346,10 @@ async def sync_env_providers(session: AsyncSession, workspace_id: str) -> None:
         )
     await session.flush()
 
+    from llmwatch.providers.models import seed_legacy_models
+
+    await seed_legacy_models(session, workspace_id)
+
 
 async def sync_env_providers_all(session: AsyncSession) -> None:
     workspace_ids = (await session.execute(select(Workspace.id))).scalars().all()
