@@ -5,9 +5,11 @@ WHY: Using a standardized tracking server like MLFlow allows the MLOps team to e
 models efficiently and build fine-tuning datasets later independent of standard application DB logs.
 """
 
+from typing import Optional
+
 import mlflow
-from typing import Optional, Dict, Any
-from config import settings, logger
+
+from config import logger, settings
 
 
 class MLFlowService:

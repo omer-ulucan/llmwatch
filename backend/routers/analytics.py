@@ -5,11 +5,12 @@ WHY: Delivering rapid analytics depends on targeted GSI queries and aggregation.
 """
 
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Request
-from typing import Dict, Any, List
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends
+
 from auth.dependencies import get_current_user
 from services.dynamo_service import get_dynamo_service
-
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -42,8 +43,8 @@ async def get_summary(current_user: Dict[str, Any] = Depends(get_current_user)):
     )
     error_count = sum(1 for log in logs if not log.get("success", True))
 
-    qwen_logs = [l for l in logs if l.get("model_name") == "qwen"]
-    gemini_logs = [l for l in logs if l.get("model_name") == "gemini"]
+    qwen_logs = [log for log in logs if log.get("model_name") == "qwen"]
+    gemini_logs = [log for log in logs if log.get("model_name") == "gemini"]
 
     return {
         "total_cost_usd": round(total_cost, 6),
@@ -54,13 +55,13 @@ async def get_summary(current_user: Dict[str, Any] = Depends(get_current_user)):
             "qwen": {
                 "requests": len(qwen_logs),
                 "cost": round(
-                    sum(to_float(l.get("cost_usd", 0)) for l in qwen_logs), 6
+                    sum(to_float(log.get("cost_usd", 0)) for log in qwen_logs), 6
                 ),
             },
             "gemini": {
                 "requests": len(gemini_logs),
                 "cost": round(
-                    sum(to_float(l.get("cost_usd", 0)) for l in gemini_logs), 6
+                    sum(to_float(log.get("cost_usd", 0)) for log in gemini_logs), 6
                 ),
             },
         },
@@ -79,7 +80,7 @@ async def get_logs_list(
     dynamo_service = get_dynamo_service()
     logs = dynamo_service.get_logs(company_id=current_user["company_id"], limit=limit)
     if model != "all":
-        logs = [l for l in logs if l.get("model_name") == model]
+        logs = [log for log in logs if log.get("model_name") == model]
 
     # WHY: Convert Decimal values to float for JSON serialization
     sanitized_logs = []

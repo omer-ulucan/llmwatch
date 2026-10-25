@@ -5,6 +5,7 @@ WHY: Gives the agent access to real-time web information without requiring an AP
 """
 
 from langchain_core.tools import tool
+
 from config import logger
 
 

@@ -6,6 +6,7 @@ WHY: HTTP headers present the first line of defense blocking malicious client-si
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+
 from config import settings
 
 

@@ -11,14 +11,14 @@ Tests covering the authentication fixes (Fixes 1–8):
 - _authenticate helper
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from botocore.exceptions import ClientError
 
-from auth.jwt_handler import verify_password, create_access_token
+from auth.jwt_handler import verify_password
+from exceptions import AuthenticationException, DatabaseException, ValidationException
 from models.schemas import RegisterResponse
-from exceptions import AuthenticationException, ValidationException, DatabaseException
-
 
 # ── verify_password: invalid hash safety (Fix 4) ─────────────────────────
 
@@ -200,7 +200,8 @@ class TestRateLimiting:
 
     def test_limiter_imported_from_rate_limit_module(self):
         """rate_limit.py should export a Limiter instance."""
-        from rate_limit import limiter
         from slowapi import Limiter
+
+        from rate_limit import limiter
 
         assert isinstance(limiter, Limiter)

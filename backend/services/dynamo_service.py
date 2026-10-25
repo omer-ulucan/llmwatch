@@ -5,13 +5,15 @@ WHY: Encapsulating database logic isolates the AWS SDK (boto3) from the rest of 
 making it easier to test, secure, and change underlying DB models in the future.
 """
 
-import boto3
-from botocore.exceptions import ClientError
-from typing import Dict, Any, List, Optional
 import uuid
 from datetime import datetime, timezone
-from config import settings, logger
-from exceptions import DatabaseException, ResourceNotFoundException
+from typing import Any, Dict, List, Optional
+
+import boto3
+from botocore.exceptions import ClientError
+
+from config import logger, settings
+from exceptions import DatabaseException
 
 
 class DynamoDBService:

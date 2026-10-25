@@ -3,13 +3,13 @@ Tests for the custom exception hierarchy in exceptions.py.
 """
 
 from exceptions import (
-    LLMWatchException,
-    ValidationException,
     AuthenticationException,
     AuthorizationException,
-    ResourceNotFoundException,
-    LLMServiceException,
     DatabaseException,
+    LLMServiceException,
+    LLMWatchException,
+    ResourceNotFoundException,
+    ValidationException,
 )
 
 

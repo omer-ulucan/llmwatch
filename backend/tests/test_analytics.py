@@ -3,8 +3,10 @@ Tests for the analytics router helper (to_float) and endpoint logic.
 """
 
 from decimal import Decimal
-from routers.analytics import to_float
 
+import pytest
+
+from routers.analytics import to_float
 
 # ── to_float helper ──────────────────────────────────────────────────────
 
@@ -33,7 +35,3 @@ class TestToFloat:
 
     def test_negative_decimal(self):
         assert to_float(Decimal("-0.005")) == pytest.approx(-0.005)
-
-
-# Need pytest for approx
-import pytest

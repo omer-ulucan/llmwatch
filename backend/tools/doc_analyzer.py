@@ -6,7 +6,9 @@ WHY: Allows the agent to read and summarize web pages or documents at given URLs
 
 import re
 from html.parser import HTMLParser
+
 from langchain_core.tools import tool
+
 from config import logger
 
 # Maximum content size to return (in characters)
@@ -61,8 +63,8 @@ def analyze_document(url: str) -> str:
     articles, documentation, or any publicly accessible document.
     Returns the extracted text content for analysis."""
     try:
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         # WHY: Validate URL format before making the request
         if not url.startswith(("http://", "https://")):

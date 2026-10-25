@@ -6,13 +6,9 @@ correct behavior without external dependencies (no real web searches,
 no real DynamoDB calls, no real URL fetches).
 """
 
-import subprocess
 import sys
 import types
 from unittest.mock import MagicMock, patch
-
-import pytest
-
 
 # ── Ensure duckduckgo_search is importable for patching ────
 # The web_search tool lazily imports DDGS inside its function body.
@@ -217,9 +213,9 @@ class TestDocAnalyzer:
 
     def test_analyze_document_html_extraction(self):
         """Verify analyze_document extracts text from HTML."""
-        from tools.doc_analyzer import analyze_document
         from unittest.mock import MagicMock
-        import io
+
+        from tools.doc_analyzer import analyze_document
 
         html_content = b"<html><head><title>Test</title></head><body><p>Hello World</p><script>var x=1;</script></body></html>"
 
@@ -238,8 +234,9 @@ class TestDocAnalyzer:
 
     def test_analyze_document_http_error(self):
         """Verify analyze_document handles HTTP errors."""
-        from tools.doc_analyzer import analyze_document
         import urllib.error
+
+        from tools.doc_analyzer import analyze_document
 
         with patch(
             "urllib.request.urlopen",

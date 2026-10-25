@@ -7,8 +7,8 @@ WHY: The AgentService is the core agent execution engine. We test:
 - The full async event generator yields the expected event sequence
 """
 
-from unittest.mock import MagicMock, patch, AsyncMock
 from typing import List
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -144,7 +144,7 @@ class TestAgentServiceRunAgent:
 
         # Mock create_react_agent and AgentExecutor to avoid needing real LLM
         with (
-            patch("services.agent_service.create_react_agent") as mock_create,
+            patch("services.agent_service.create_react_agent"),
             patch("services.agent_service.AgentExecutor") as MockExecutor,
         ):
             mock_executor_instance = MagicMock()
@@ -176,6 +176,7 @@ class TestAgentServiceRunAgent:
     async def test_run_agent_run_end_contains_summary_json(self):
         """Verify the run_end event content is valid JSON with summary fields."""
         import json
+
         from services.agent_service import AgentService
 
         mock_llm_service = MagicMock()

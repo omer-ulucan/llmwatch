@@ -8,15 +8,11 @@ WHY: The tracing system is the backbone of agent observability. We test that:
 - build_summary and build_trace_data produce correct output
 """
 
-import asyncio
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
-import pytest
-
 from services.tracing_service import AgentEvent, AgentRunSummary, TracingCallbackHandler
-
 
 # ── AgentEvent Model Tests ─────────────────────────────────
 
@@ -163,7 +159,7 @@ class TestTracingCallbackHandler:
 
     def test_on_llm_end_emits_thinking_event(self):
         """Verify on_llm_end emits a 'thinking' event with content and latency."""
-        from langchain_core.outputs import LLMResult, Generation
+        from langchain_core.outputs import Generation, LLMResult
 
         handler = self._make_handler()
         handler._llm_start_time = time.perf_counter() - 0.1  # 100ms ago
@@ -337,7 +333,7 @@ class TestTracingCallbackHandler:
 
     def test_content_truncation_in_on_llm_end(self):
         """Verify long LLM output is truncated to 2000 chars."""
-        from langchain_core.outputs import LLMResult, Generation
+        from langchain_core.outputs import Generation, LLMResult
 
         handler = self._make_handler()
         long_text = "x" * 5000

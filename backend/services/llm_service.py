@@ -5,12 +5,14 @@ WHY: Abstracting model specifics allows the chat router to be completely agnosti
 we're hitting OpenAI, Gemini, or a self-hosted vLLM endpoint.
 """
 
-import time
 import re
-from typing import Dict, Any, Tuple, Optional
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
+import time
+from typing import Any, Dict, Optional, Tuple
+
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+
 from config import settings
 from exceptions import LLMServiceException
 

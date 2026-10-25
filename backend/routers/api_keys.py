@@ -6,24 +6,25 @@ machine-to-machine integrations (SDKs, CI pipelines, monitoring scripts).
 The raw key is returned ONCE at creation time — only a SHA-256 hash is stored.
 """
 
-import secrets
 import hashlib
+import secrets
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Request
-from config import logger
+
 from auth.dependencies import get_current_user
-from services.dynamo_service import get_dynamo_service
+from config import logger
+from exceptions import ResourceNotFoundException
 from models.schemas import (
+    ApiKeyListResponse,
+    ApiKeyResponse,
     CreateApiKeyRequest,
     CreateApiKeyResponse,
-    ApiKeyResponse,
-    ApiKeyListResponse,
 )
-from exceptions import ResourceNotFoundException
 from rate_limit import limiter
+from services.dynamo_service import get_dynamo_service
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
 

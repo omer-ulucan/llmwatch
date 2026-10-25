@@ -6,9 +6,9 @@ WHY: This is the core agent orchestration layer. It reuses the existing LLM stra
 to enable multi-step tool-augmented reasoning.
 """
 
-import uuid
 import asyncio
-from typing import Any, AsyncGenerator, Dict, List
+import uuid
+from typing import Any, AsyncGenerator, List
 
 # WHY: langchain.agents.AgentExecutor and create_react_agent may fail to import on
 # some Python versions (e.g. 3.14) due to internal langchain compatibility issues.
@@ -29,11 +29,10 @@ from langchain_core.tools import BaseTool
 from config import logger
 from services.llm_service import LLMService, get_llm_service
 from services.tracing_service import AgentEvent, TracingCallbackHandler
-from tools.web_search import web_search
 from tools.code_executor import execute_python
 from tools.db_query import make_db_query_tool
 from tools.doc_analyzer import analyze_document
-
+from tools.web_search import web_search
 
 # WHY: Custom ReAct prompt template instead of pulling from langchain hub.
 # This avoids a network dependency and gives us control over the exact format.
