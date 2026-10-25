@@ -30,18 +30,6 @@ _PLACEHOLDER_SECRETS = {
 
 
 class Settings(BaseSettings):
-    # AWS Settings
-    # WHY: Credentials are optional so the app can use IAM instance roles on EC2.
-    # When empty, boto3 falls back to the default credential chain
-    # (env vars → instance metadata → ~/.aws/credentials).
-    aws_region: str
-    aws_access_key_id: str = ""
-    aws_secret_access_key: str = ""
-    dynamodb_table_logs: str
-    dynamodb_table_users: str
-    dynamodb_table_traces: str = "llmwatch_traces"
-    dynamodb_table_api_keys: str = "llmwatch_api_keys"
-
     # Database
     # WHY: SQLite works with zero setup; set postgresql+asyncpg://... for Postgres
     # (install the "postgres" extra).
@@ -68,7 +56,9 @@ class Settings(BaseSettings):
     qwen_api_key: str = ""
 
     # MLFlow Settings
-    mlflow_tracking_uri: str
+    # Optional: also log every LLM call to an MLflow tracking server (needs the
+    # "mlflow" extra). Empty disables MLflow entirely.
+    mlflow_tracking_uri: str = ""
 
     # Signups: when false, only the very first account can be created (bootstrap).
     allow_signup: bool = True

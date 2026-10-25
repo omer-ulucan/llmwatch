@@ -234,7 +234,7 @@ class AgentService:
 
         # Store the handler's trace data and summary on the event for the router to access
         # WHY: We attach metadata to the final event so the router can save it
-        # to DynamoDB without needing to reach back into the service internals.
+        # without needing to reach back into the service internals.
         end_event._trace_data = handler.build_trace_data(prompt, tools, success)  # type: ignore[attr-defined]
 
 

@@ -7,8 +7,7 @@ Supports two auth methods:
   2. X-API-Key header (for programmatic/SDK access)
 
 Both resolve to the same user context dict:
-  user_id, workspace_id, role, email, auth_method ("jwt" | "api_key"), api_key_id,
-  and company_id (deprecated alias of workspace_id, removed with DynamoDB).
+  user_id, workspace_id, role, email, auth_method ("jwt" | "api_key"), api_key_id.
 The user row is loaded on every request, so deactivated users and deleted
 workspaces lose access immediately instead of when their token expires.
 """
@@ -45,7 +44,6 @@ def _context(
     return {
         "user_id": user.id if user else None,
         "workspace_id": workspace_id,
-        "company_id": workspace_id,
         "role": user.role if user else "member",
         "email": user.email if user else None,
         "auth_method": auth_method,

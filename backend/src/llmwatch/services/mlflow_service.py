@@ -1,27 +1,42 @@
 """
 Module: mlflow_service.py
-Purpose: Logs metrics and artifacts about LLM usage to the MLFlow tracking server.
-WHY: Using a standardized tracking server like MLFlow allows the MLOps team to evaluate
-models efficiently and build fine-tuning datasets later independent of standard application DB logs.
+Purpose: Optionally logs metrics about LLM usage to an MLflow tracking server.
+WHY: Teams that already use MLflow can mirror LLM calls there. It is off unless
+MLFLOW_TRACKING_URI is set, and mlflow is an optional extra (`llmwatch[mlflow]`),
+so the default install stays small and never tries to reach a tracking server.
 """
 
-from typing import Optional
-
-import mlflow
+from typing import Any, Optional
 
 from llmwatch.config import logger, settings
 
 
 class MLFlowService:
-    """Service to asynchronously interact with MLFlow."""
+    """Service to interact with MLflow; every call is a no-op when disabled."""
 
     def __init__(self):
+        self._mlflow: Any = None
+        if not settings.mlflow_tracking_uri:
+            return
+        try:
+            import mlflow
+        except ImportError:
+            logger.warning(
+                "MLFLOW_TRACKING_URI is set but mlflow is not installed; "
+                "install llmwatch[mlflow] to enable it. MLflow logging is off."
+            )
+            return
         # WHY: Setting tracking URI centrally ensures all runs go to the right instance
         try:
             mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+            self._mlflow = mlflow
             logger.info(f"MLFlow tracking URI set to {settings.mlflow_tracking_uri}")
         except Exception as e:
             logger.error(f"Failed to set MLFlow tracking URI: {str(e)}")
+
+    @property
+    def enabled(self) -> bool:
+        return self._mlflow is not None
 
     def log_llm_call(
         self,
@@ -55,6 +70,9 @@ class MLFlowService:
             response_preview (str): Masked response.
             error_type (Optional[str]): Exception class string if failed.
         """
+        if self._mlflow is None:
+            return
+        mlflow = self._mlflow
         # WHY: Company-specific experiments simplify data partitioning for analytics
         experiment_name = f"llmwatch_{company_id}"
         try:

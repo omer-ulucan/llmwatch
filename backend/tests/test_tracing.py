@@ -304,7 +304,7 @@ class TestTracingCallbackHandler:
         assert summary.total_latency_ms > 0
 
     def test_build_trace_data(self):
-        """Verify build_trace_data produces correct dict for DynamoDB storage."""
+        """Verify build_trace_data produces the dict stored for a trace."""
         from langchain_core.agents import AgentFinish
 
         handler = self._make_handler()
