@@ -159,7 +159,11 @@ class LLMService:
     """Orchestrator for managing LLM interactions."""
 
     def __init__(self):
-        self.strategies: Dict[str, LLMStrategy] = {"gemini": GeminiStrategy()}
+        self.strategies: Dict[str, LLMStrategy] = {}
+        # WHY: Only register providers that are configured, so the server starts
+        # without any LLM credentials (zero-config install).
+        if settings.google_api_key:
+            self.strategies["gemini"] = GeminiStrategy()
         # Register Qwen whenever a base URL is configured.
         # API key is optional for self-hosted or gateway-authenticated deployments.
         if settings.qwen_base_url:

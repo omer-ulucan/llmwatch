@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     jwt_expire_hours: int = 24
 
     # LLM Models Settings
-    google_api_key: str
+    google_api_key: str = ""
     qwen_base_url: str = ""
     qwen_api_key: str = ""
 
@@ -99,7 +99,9 @@ class Settings(BaseSettings):
     # Application Settings
     app_env: Literal["development", "production", "testing"] = "development"
     app_version: str = _package_version()
-    cors_origins: str | List[str]
+    # Comma-separated browser origins allowed to call the API directly. Empty is
+    # fine behind the bundled nginx, which serves the UI and API on one origin.
+    cors_origins: str | List[str] = ""
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
