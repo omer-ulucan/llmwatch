@@ -7,13 +7,13 @@ from unittest.mock import patch
 
 import pytest
 
-from auth.jwt_handler import (
+from llmwatch.auth.jwt_handler import (
     create_access_token,
     decode_access_token,
     get_password_hash,
     verify_password,
 )
-from exceptions import AuthenticationException
+from llmwatch.exceptions import AuthenticationException
 
 # ── Password hashing ─────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ class TestPasswordHashing:
 
     def test_verify_delegates_to_bcrypt(self):
         """verify_password should call bcrypt.checkpw under the hood."""
-        with patch("auth.jwt_handler.bcrypt") as mock_bcrypt:
+        with patch("llmwatch.auth.jwt_handler.bcrypt") as mock_bcrypt:
             mock_bcrypt.checkpw.return_value = True
             result = verify_password("plain", "$2b$12$somehash")
             mock_bcrypt.checkpw.assert_called_once_with(b"plain", b"$2b$12$somehash")
@@ -50,7 +50,7 @@ class TestPasswordHashing:
 
     def test_hash_delegates_to_bcrypt(self):
         """get_password_hash should call bcrypt.gensalt and bcrypt.hashpw."""
-        with patch("auth.jwt_handler.bcrypt") as mock_bcrypt:
+        with patch("llmwatch.auth.jwt_handler.bcrypt") as mock_bcrypt:
             mock_bcrypt.gensalt.return_value = b"$2b$12$fakesalt"
             mock_bcrypt.hashpw.return_value = b"$2b$12$fakehashed"
             result = get_password_hash("secret")

@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 # Imported at module load, under conftest's valid env: importing config later,
 # after monkeypatching a bad env, would fail in the module-level settings object.
-from config import Settings
+from llmwatch.config import Settings
 
 
 @pytest.mark.parametrize("secret", ["", "short", "x" * 31])

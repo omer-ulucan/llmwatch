@@ -12,7 +12,11 @@ import time
 from datetime import datetime
 from uuid import uuid4
 
-from services.tracing_service import AgentEvent, AgentRunSummary, TracingCallbackHandler
+from llmwatch.services.tracing_service import (
+    AgentEvent,
+    AgentRunSummary,
+    TracingCallbackHandler,
+)
 
 # ── AgentEvent Model Tests ─────────────────────────────────
 

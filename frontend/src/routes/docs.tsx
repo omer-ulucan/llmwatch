@@ -513,8 +513,8 @@ cp .env.example backend/.env
 cd backend
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+pip install -e ".[dev]"
+llmwatch serve --reload --port 8000
 
 # Frontend (in a separate terminal)
 cd frontend

@@ -14,9 +14,9 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from auth.jwt_handler import create_access_token
-from config import settings
-from rate_limit import client_ip, limiter, rate_limit_key
+from llmwatch.auth.jwt_handler import create_access_token
+from llmwatch.config import settings
+from llmwatch.rate_limit import client_ip, limiter, rate_limit_key
 
 TRUSTED = "10.0.0.0/8, 172.16.0.0/12"
 
@@ -129,7 +129,7 @@ def test_anonymous_requests_are_keyed_by_client_ip(trusted_proxies):
 @pytest.fixture
 def chat_app(monkeypatch, trusted_proxies):
     """The real app with the LLM and persistence layers stubbed out."""
-    from main import app
+    from llmwatch.main import app
 
     llm = MagicMock()
     llm.execute_chat = AsyncMock(
@@ -148,9 +148,9 @@ def chat_app(monkeypatch, trusted_proxies):
     monkeypatch.setattr(settings, "rate_limit_per_ip", "1000/minute")
     limiter.reset()
     with (
-        patch("routers.chat.get_llm_service", return_value=llm),
-        patch("routers.chat.get_dynamo_service"),
-        patch("routers.chat.get_mlflow_service"),
+        patch("llmwatch.routers.chat.get_llm_service", return_value=llm),
+        patch("llmwatch.routers.chat.get_dynamo_service"),
+        patch("llmwatch.routers.chat.get_mlflow_service"),
     ):
         # Requests arrive from nginx (a trusted proxy) for every user.
         yield TestClient(app, client=("172.18.0.5", 50000))
@@ -191,7 +191,7 @@ def test_per_ip_limit_still_applies_across_identities(chat_app, monkeypatch):
 
 
 def test_agent_run_is_rate_limited(monkeypatch, trusted_proxies):
-    from main import app
+    from llmwatch.main import app
 
     async def fake_run_agent(**kwargs):
         if False:
@@ -205,9 +205,9 @@ def test_agent_run_is_rate_limited(monkeypatch, trusted_proxies):
     headers = {"Authorization": f"Bearer {token}"}
     body = {"prompt": "hi", "model": "gemini", "tools": []}
     with (
-        patch("routers.agent.get_agent_service", return_value=agent),
-        patch("routers.agent.get_dynamo_service"),
-        patch("routers.agent.get_mlflow_service"),
+        patch("llmwatch.routers.agent.get_agent_service", return_value=agent),
+        patch("llmwatch.routers.agent.get_dynamo_service"),
+        patch("llmwatch.routers.agent.get_mlflow_service"),
     ):
         client = TestClient(app)
         assert client.post("/agent/run", json=body, headers=headers).status_code == 200

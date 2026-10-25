@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from exceptions import LLMServiceException
-from services.llm_service import LLMService, LLMStrategy
+from llmwatch.exceptions import LLMServiceException
+from llmwatch.services.llm_service import LLMService, LLMStrategy
 
 # ── Cost calculation ─────────────────────────────────────────────────────
 

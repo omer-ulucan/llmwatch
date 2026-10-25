@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from routers.analytics import to_float
+from llmwatch.routers.analytics import to_float
 
 # ── to_float helper ──────────────────────────────────────────────────────
 

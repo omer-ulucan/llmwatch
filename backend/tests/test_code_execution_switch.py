@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 @pytest.fixture
 def code_execution(monkeypatch):
-    from config import settings
+    from llmwatch.config import settings
 
     def _set(enabled: bool):
         monkeypatch.setattr(settings, "enable_code_execution", enabled)
@@ -22,14 +22,14 @@ def code_execution(monkeypatch):
 
 def test_code_execution_is_disabled_by_default(monkeypatch):
     monkeypatch.delenv("ENABLE_CODE_EXECUTION", raising=False)
-    from config import Settings
+    from llmwatch.config import Settings
 
     assert Settings().enable_code_execution is False
 
 
 def test_code_tool_not_built_when_disabled(code_execution):
     code_execution(False)
-    from services.agent_service import build_tools
+    from llmwatch.services.agent_service import build_tools
 
     tools = build_tools("company-123", ["web_search", "code_execute"])
 
@@ -38,7 +38,7 @@ def test_code_tool_not_built_when_disabled(code_execution):
 
 def test_code_tool_refuses_to_run_when_disabled(code_execution, tmp_path):
     code_execution(False)
-    from tools.code_executor import execute_python
+    from llmwatch.tools.code_executor import execute_python
 
     marker = tmp_path / "ran"
     result = execute_python.invoke(f"open({str(marker)!r}, 'w').write('x')")
@@ -49,7 +49,7 @@ def test_code_tool_refuses_to_run_when_disabled(code_execution, tmp_path):
 
 def test_agent_request_rejects_code_execute_when_disabled(code_execution):
     code_execution(False)
-    from models.schemas import AgentRunRequest
+    from llmwatch.models.schemas import AgentRunRequest
 
     with pytest.raises(ValidationError, match="code_execute"):
         AgentRunRequest(prompt="hi", model="gemini", tools=["code_execute"])
@@ -57,7 +57,7 @@ def test_agent_request_rejects_code_execute_when_disabled(code_execution):
 
 def test_agent_request_default_tools_exclude_disabled_code_execute(code_execution):
     code_execution(False)
-    from models.schemas import AgentRunRequest
+    from llmwatch.models.schemas import AgentRunRequest
 
     req = AgentRunRequest(prompt="hi", model="gemini")
 
@@ -67,7 +67,7 @@ def test_agent_request_default_tools_exclude_disabled_code_execute(code_executio
 
 def test_agent_request_accepts_code_execute_when_enabled(code_execution):
     code_execution(True)
-    from models.schemas import AgentRunRequest
+    from llmwatch.models.schemas import AgentRunRequest
 
     req = AgentRunRequest(prompt="hi", model="gemini", tools=["code_execute"])
 
@@ -75,7 +75,7 @@ def test_agent_request_accepts_code_execute_when_enabled(code_execution):
 
 
 def test_available_tools_reflects_switch(code_execution):
-    from services.agent_service import available_tools
+    from llmwatch.services.agent_service import available_tools
 
     code_execution(False)
     assert "code_execute" not in available_tools()
@@ -91,14 +91,14 @@ class TestHardeningWhenEnabled:
         code_execution(True)
 
     def test_child_runs_in_isolated_mode(self):
-        from tools.code_executor import execute_python
+        from llmwatch.tools.code_executor import execute_python
 
         result = execute_python.invoke("import sys; print(sys.flags.isolated)")
         assert result.strip() == "1"
 
     def test_child_environment_has_no_backend_secrets(self, monkeypatch):
         monkeypatch.setenv("SUPER_SECRET_TOKEN", "s3cr3t")
-        from tools.code_executor import execute_python
+        from llmwatch.tools.code_executor import execute_python
 
         result = execute_python.invoke("import os; print(sorted(os.environ))")
         assert "SUPER_SECRET_TOKEN" not in result
@@ -107,7 +107,7 @@ class TestHardeningWhenEnabled:
     def test_child_runs_in_a_throwaway_working_directory(self):
         import os
 
-        from tools.code_executor import execute_python
+        from llmwatch.tools.code_executor import execute_python
 
         result = execute_python.invoke("import os; print(os.getcwd())")
         assert result.strip() != os.getcwd()
@@ -116,7 +116,7 @@ class TestHardeningWhenEnabled:
     def test_child_has_resource_limits(self):
         import resource
 
-        from tools.code_executor import MAX_MEMORY_BYTES, execute_python
+        from llmwatch.tools.code_executor import MAX_MEMORY_BYTES, execute_python
 
         result = execute_python.invoke(
             "import resource; print(resource.getrlimit(resource.RLIMIT_AS)[1])"
@@ -127,7 +127,7 @@ class TestHardeningWhenEnabled:
             assert hard_as == MAX_MEMORY_BYTES
 
     def test_timeout_kills_the_child(self, monkeypatch):
-        import tools.code_executor as ce
+        import llmwatch.tools.code_executor as ce
 
         monkeypatch.setattr(ce, "EXECUTION_TIMEOUT", 1)
         result = ce.execute_python.invoke("while True: pass")
@@ -137,8 +137,8 @@ class TestHardeningWhenEnabled:
 def test_tools_endpoint_lists_only_enabled_tools(code_execution):
     from fastapi.testclient import TestClient
 
-    from auth.dependencies import get_current_user
-    from main import app
+    from llmwatch.auth.dependencies import get_current_user
+    from llmwatch.main import app
 
     app.dependency_overrides[get_current_user] = lambda: {
         "user_id": "u1",
