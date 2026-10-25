@@ -6,39 +6,29 @@ straight out of the handler, nothing was recorded, and the dashboard's error rat
 was always 0%. Every failure also surfaced as a generic 500.
 """
 
-from unittest.mock import patch
-
 import httpx
 import pytest
 
-from llmwatch.services.llm_service import LegacyRoute, LLMService
-from tests.fake_llm import FakeProvider
+
+@pytest.fixture
+def fake_gemini(fake_llm):
+    return fake_llm
 
 
 @pytest.fixture
-def fake_gemini():
-    fake = FakeProvider()
-    with patch.object(LLMService, "__init__", lambda self: None):
-        svc = LLMService()
-    svc.routes = {
-        "gemini": LegacyRoute(
-            alias="gemini",
-            client=fake.client(),
-            model_id="gemini-test",
-            preset="gemini",
-        )
-    }
-    with (
-        patch("llmwatch.routers.chat.get_llm_service", return_value=svc),
-        patch("llmwatch.routers.chat.get_mlflow_service"),
-    ):
-        yield fake
+async def acct_with_model(make_account, add_model):
+    async def _new():
+        account = await make_account()
+        await add_model(account, preset="gemini", provider_name="Gemini")
+        return account
+
+    return _new
 
 
-async def _chat(client, account):
+async def _chat(client, account, model="fake-model"):
     return await client.post(
         "/chat/completions",
-        json={"prompt": "hello there", "model": "gemini"},
+        json={"prompt": "hello there", "model": model},
         headers=account.headers,
     )
 
@@ -59,9 +49,9 @@ async def _logs(client, account):
     ],
 )
 async def test_provider_errors_are_logged_and_mapped(
-    client, make_account, fake_gemini, status, kind, http_status
+    client, acct_with_model, fake_gemini, status, kind, http_status
 ):
-    acct = await make_account()
+    acct = await acct_with_model()
     fake_gemini.fail(status, message="upstream says no")
 
     resp = await _chat(client, acct)
@@ -80,8 +70,8 @@ async def test_provider_errors_are_logged_and_mapped(
     assert log["cost_usd"] == 0
 
 
-async def test_timeouts_are_logged_as_504(client, make_account, fake_gemini):
-    acct = await make_account()
+async def test_timeouts_are_logged_as_504(client, acct_with_model, fake_gemini):
+    acct = await acct_with_model()
     fake_gemini.raise_(httpx.ReadTimeout("slow"))
 
     resp = await _chat(client, acct)
@@ -92,16 +82,18 @@ async def test_timeouts_are_logged_as_504(client, make_account, fake_gemini):
     assert log["status_code"] is None
 
 
-async def test_rate_limit_passes_retry_after_through(client, make_account, fake_gemini):
-    acct = await make_account()
+async def test_rate_limit_passes_retry_after_through(
+    client, acct_with_model, fake_gemini
+):
+    acct = await acct_with_model()
     fake_gemini.fail(429, retry_after="7")
     resp = await _chat(client, acct)
     assert resp.status_code == 429
     assert resp.headers["retry-after"] == "7"
 
 
-async def test_error_rate_reflects_failures(client, make_account, fake_gemini):
-    acct = await make_account()
+async def test_error_rate_reflects_failures(client, acct_with_model, fake_gemini):
+    acct = await acct_with_model()
     fake_gemini.reply("fine").fail(500).reply("fine").fail(503)
     for _ in range(4):
         await _chat(client, acct)
@@ -111,21 +103,24 @@ async def test_error_rate_reflects_failures(client, make_account, fake_gemini):
     assert summary["error_rate_pct"] == 50.0
 
 
-async def test_unconfigured_model_is_400_and_not_logged(client, make_account):
+async def test_unconfigured_model_is_400_and_not_logged(client, acct_with_model):
     """No provider call happened, so there is nothing to log."""
-    acct = await make_account()
-    with patch.object(LLMService, "__init__", lambda self: None):
-        svc = LLMService()
-    svc.routes = {}
-    with patch("llmwatch.routers.chat.get_llm_service", return_value=svc):
-        resp = await _chat(client, acct)
+    acct = await acct_with_model()
+    resp = await _chat(client, acct, model="no-such-model")
     assert resp.status_code == 400
-    assert "Unsupported model" in resp.json()["error"]
+    assert "Unknown or disabled model" in resp.json()["error"]
     assert await _logs(client, acct) == []
 
 
-async def test_error_messages_are_truncated(client, make_account, fake_gemini):
-    acct = await make_account()
+async def test_legacy_alias_without_configuration_is_400(client, acct_with_model):
+    acct = await acct_with_model()
+    resp = await _chat(client, acct, model="qwen")
+    assert resp.status_code == 400
+    assert "isn't configured" in resp.json()["error"]
+
+
+async def test_error_messages_are_truncated(client, acct_with_model, fake_gemini):
+    acct = await acct_with_model()
     fake_gemini.fail(500, message="x" * 5000)
     await _chat(client, acct)
     (log,) = await _logs(client, acct)

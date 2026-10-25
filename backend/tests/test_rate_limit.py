@@ -8,7 +8,7 @@ trusted when the peer is a configured proxy, otherwise clients can spoof it.
 """
 
 import hashlib
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from starlette.requests import Request
@@ -126,60 +126,55 @@ def test_anonymous_requests_are_keyed_by_client_ip(trusted_proxies):
 
 
 @pytest.fixture
-async def proxied(app_db, trusted_proxies, monkeypatch):
+async def proxied(app_db, trusted_proxies, monkeypatch, fake_llm):
     """The real app behind "nginx": every request comes from the proxy address.
 
-    The LLM and persistence layers are stubbed out; auth uses the test database.
+    Chat goes to the fake OpenAI-compatible server; auth uses the test database.
     """
     import httpx
 
     from llmwatch.main import app
 
-    llm = MagicMock()
-    llm.execute_chat = AsyncMock(
-        return_value={
-            "response": "hi",
-            "thinking_content": None,
-            "latency_ms": 1.0,
-            "input_tokens": 1,
-            "output_tokens": 1,
-            "cost_usd": 0.0,
-            "model_used": "gemini",
-            "thinking_mode": False,
-        }
-    )
     monkeypatch.setattr(settings, "rate_limit_chat", "2/minute")
     monkeypatch.setattr(settings, "rate_limit_per_ip", "1000/minute")
     limiter.reset()
     transport = httpx.ASGITransport(app=app, client=("172.18.0.5", 50000))
-    with (
-        patch("llmwatch.routers.chat.get_llm_service", return_value=llm),
-        patch("llmwatch.routers.chat.get_mlflow_service"),
-    ):
-        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
-            yield c
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+        yield c
     limiter.reset()
+
+
+@pytest.fixture
+def new_user(make_account, add_model):
+    """An account whose workspace has the fake chat model."""
+
+    async def _new():
+        account = await make_account()
+        await add_model(account)
+        return account
+
+    return _new
 
 
 async def _chat(client, account, ip: str = "198.51.100.7"):
     return await client.post(
         "/chat/completions",
-        json={"prompt": "hello", "model": "gemini"},
+        json={"prompt": "hello", "model": "fake-model"},
         headers={**account.headers, "X-Forwarded-For": ip},
     )
 
 
-async def test_chat_completions_is_rate_limited(proxied, make_account):
-    alice = await make_account()
+async def test_chat_completions_is_rate_limited(proxied, new_user):
+    alice = await new_user()
     assert (await _chat(proxied, alice)).status_code == 200
     assert (await _chat(proxied, alice)).status_code == 200
     assert (await _chat(proxied, alice)).status_code == 429
 
 
-async def test_users_behind_the_same_proxy_have_separate_buckets(proxied, make_account):
+async def test_users_behind_the_same_proxy_have_separate_buckets(proxied, new_user):
     """Regression: all users used to share the proxy's IP bucket."""
-    alice = await make_account()
-    bob = await make_account()
+    alice = await new_user()
+    bob = await new_user()
     for _ in range(2):
         assert (await _chat(proxied, alice, ip="198.51.100.7")).status_code == 200
     assert (await _chat(proxied, alice, ip="198.51.100.7")).status_code == 429
@@ -188,12 +183,12 @@ async def test_users_behind_the_same_proxy_have_separate_buckets(proxied, make_a
 
 
 async def test_per_ip_limit_still_applies_across_identities(
-    proxied, make_account, monkeypatch
+    proxied, new_user, monkeypatch
 ):
     """Rotating API keys or accounts from one address doesn't escape the IP cap."""
     monkeypatch.setattr(settings, "rate_limit_chat", "100/minute")
     monkeypatch.setattr(settings, "rate_limit_per_ip", "3/minute")
-    users = [await make_account() for _ in range(4)]
+    users = [await new_user() for _ in range(4)]
     statuses = [(await _chat(proxied, u)).status_code for u in users]
     assert statuses == [200, 200, 200, 429]
 
@@ -218,8 +213,8 @@ async def test_agent_run_is_rate_limited(client, make_account, monkeypatch):
     assert second.status_code == 429
 
 
-async def test_rate_limit_response_uses_error_envelope(proxied, make_account):
-    carol = await make_account()
+async def test_rate_limit_response_uses_error_envelope(proxied, new_user):
+    carol = await new_user()
     for _ in range(2):
         await _chat(proxied, carol)
     resp = await _chat(proxied, carol)

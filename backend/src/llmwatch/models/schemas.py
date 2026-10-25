@@ -5,7 +5,7 @@ WHY: Strict typing and explicit forbid of extra fields stops injection vulnerabi
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import (
     BaseModel,
@@ -91,11 +91,34 @@ class DeleteWorkspaceRequest(BaseModel):
     confirm_name: str
 
 
-class ChatCompletionRequest(BaseModel):
+class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    prompt: str = Field(..., max_length=10000)
-    model: str = Field(..., pattern="^(qwen|gemini)$")
+    role: Literal["system", "user", "assistant"]
+    content: str = Field(..., max_length=100_000)
+
+
+class ChatCompletionRequest(BaseModel):
+    """
+    One chat turn. Send `prompt` (single user message), `messages` (history), or
+    both (`prompt` is appended as the newest user message).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    # Any model reference: id, "Provider/model-id", "default", or legacy aliases.
+    model: str = Field(..., min_length=1, max_length=300)
+    prompt: Optional[str] = Field(None, max_length=50_000)
+    messages: Optional[List[ChatMessage]] = Field(None, max_length=200)
+    system_prompt: Optional[str] = Field(None, max_length=20_000)
     thinking_mode: bool = False
+    temperature: Optional[float] = Field(None, ge=0, le=2)
+    max_tokens: Optional[int] = Field(None, gt=0, le=200_000)
+    top_p: Optional[float] = Field(None, gt=0, le=1)
+
+    @model_validator(mode="after")
+    def _needs_content(self) -> "ChatCompletionRequest":
+        if not self.prompt and not self.messages:
+            raise ValueError("Send a prompt or messages")
+        return self
 
 
 class ChatCompletionResponse(BaseModel):
@@ -104,8 +127,15 @@ class ChatCompletionResponse(BaseModel):
     latency_ms: float
     input_tokens: int
     output_tokens: int
+    reasoning_tokens: int = 0
+    # False when the provider didn't report token usage.
+    usage_reported: bool = True
     cost_usd: float
+    # False when the model has no price set (cost_usd is then 0).
+    priced: bool = True
     model_used: str
+    model_id: Optional[str] = None
+    finish_reason: Optional[str] = None
     thinking_mode: bool
 
 
