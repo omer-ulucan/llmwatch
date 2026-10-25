@@ -12,12 +12,14 @@ import AgentTimeline from '@/components/agent/AgentTimeline';
 import AgentToolConfig from '@/components/agent/AgentToolConfig';
 import AgentSummaryCard from '@/components/agent/AgentSummaryCard';
 import { useAgentStream } from '@/hooks/useAgentStream';
+import { agentApi } from '@/api/agent';
 import type { AgentRunRequest } from '@/types';
 
 const Agent: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState<'qwen' | 'gemini'>('gemini');
-  const [selectedTools, setSelectedTools] = useState<string[]>(['web_search', 'code_execute', 'db_query', 'doc_analyze']);
+  const [availableTools, setAvailableTools] = useState<string[]>([]);
+  const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [maxIterations, setMaxIterations] = useState(10);
 
   const { steps, isRunning, error, summary, runAgent, reset } = useAgentStream();
@@ -26,6 +28,16 @@ const Agent: React.FC = () => {
   useEffect(() => {
     timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [steps]);
+
+  // WHY: Some tools (code execution) are opt-in on the server; only offer what it allows.
+  useEffect(() => {
+    agentApi.getTools()
+      .then(res => {
+        setAvailableTools(res.data.tools);
+        setSelectedTools(res.data.tools);
+      })
+      .catch(console.error);
+  }, []);
 
   const handleRun = async () => {
     if (!prompt.trim() || isRunning) return;
@@ -85,7 +97,7 @@ const Agent: React.FC = () => {
 
         {/* Tool Selection */}
         <div className="mb-6">
-          <AgentToolConfig selectedTools={selectedTools} onChange={setSelectedTools} />
+          <AgentToolConfig availableTools={availableTools} selectedTools={selectedTools} onChange={setSelectedTools} />
         </div>
 
         {/* Max Iterations */}

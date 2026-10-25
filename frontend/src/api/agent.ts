@@ -21,6 +21,12 @@ export const agentApi = {
     apiClient.get<{ trace: AgentTrace }>(`/agent/traces/${runId}`),
 
   /**
+   * Fetch the tools this server allows (some, like code execution, are opt-in).
+   */
+  getTools: () =>
+    apiClient.get<{ tools: string[] }>('/agent/tools'),
+
+  /**
    * Fetch aggregate agent metrics for the dashboard KPI cards.
    */
   getAgentAnalytics: () =>

@@ -8,6 +8,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from tools.registry import ALL_TOOLS, available_tools
+
 
 class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -63,7 +65,7 @@ class AgentRunRequest(BaseModel):
 
     prompt: str = Field(..., max_length=10000)
     model: str
-    tools: List[str] = ["web_search", "code_execute", "db_query", "doc_analyze"]
+    tools: List[str] = Field(default_factory=available_tools)
     max_iterations: int = 10
 
     @field_validator("model")
@@ -76,10 +78,18 @@ class AgentRunRequest(BaseModel):
     @field_validator("tools")
     @classmethod
     def validate_tools(cls, v: List[str]) -> List[str]:
-        valid = {"web_search", "code_execute", "db_query", "doc_analyze"}
         for t in v:
-            if t not in valid:
-                raise ValueError(f"Invalid tool: {t}. Must be one of {valid}")
+            if t not in ALL_TOOLS:
+                raise ValueError(f"Invalid tool: {t}. Must be one of {list(ALL_TOOLS)}")
+            if t not in available_tools():
+                raise ValueError(
+                    f"Tool {t} is disabled on this server"
+                    + (
+                        " (set ENABLE_CODE_EXECUTION=true to enable it)"
+                        if t == "code_execute"
+                        else ""
+                    )
+                )
         return v
 
     @field_validator("max_iterations")

@@ -32,6 +32,7 @@ from services.tracing_service import AgentEvent, TracingCallbackHandler
 from tools.code_executor import execute_python
 from tools.db_query import make_db_query_tool
 from tools.doc_analyzer import analyze_document
+from tools.registry import available_tools
 from tools.web_search import web_search
 
 # WHY: Custom ReAct prompt template instead of pulling from langchain hub.
@@ -75,13 +76,16 @@ def build_tools(company_id: str, enabled_tools: List[str]) -> List[BaseTool]:
     Returns:
         List of LangChain BaseTool instances ready for agent use.
     """
-    available = {
-        "web_search": web_search,
-        "code_execute": execute_python,
-        "db_query": make_db_query_tool(company_id),
-        "doc_analyze": analyze_document,
+    allowed = set(available_tools())
+    factories = {
+        "web_search": lambda: web_search,
+        "code_execute": lambda: execute_python,
+        "db_query": lambda: make_db_query_tool(company_id),
+        "doc_analyze": lambda: analyze_document,
     }
-    return [available[t] for t in enabled_tools if t in available]
+    # WHY: Disabled tools (e.g. code_execute without ENABLE_CODE_EXECUTION) are
+    # dropped here even if a caller skipped request validation.
+    return [factories[t]() for t in enabled_tools if t in factories and t in allowed]
 
 
 class AgentService:

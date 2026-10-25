@@ -38,10 +38,12 @@ _skip_agent = pytest.mark.skipif(
 class TestBuildTools:
     """Tests for the tool factory function."""
 
-    def test_build_tools_all(self):
+    def test_build_tools_all(self, monkeypatch):
         """Verify build_tools returns all 4 tools when all are requested."""
+        from config import settings
         from services.agent_service import build_tools
 
+        monkeypatch.setattr(settings, "enable_code_execution", True)
         tools = build_tools(
             "company-123", ["web_search", "code_execute", "db_query", "doc_analyze"]
         )
