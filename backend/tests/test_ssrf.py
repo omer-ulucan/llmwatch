@@ -14,7 +14,7 @@ import ipaddress
 import httpx
 import pytest
 
-from security.ssrf import (
+from llmwatch.security.ssrf import (
     BlockedURLError,
     host_is_allowlisted,
     is_blocked_ip,

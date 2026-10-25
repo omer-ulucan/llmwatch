@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from auth.jwt_handler import create_access_token
-from rate_limit import limiter
+from llmwatch.auth.jwt_handler import create_access_token
+from llmwatch.rate_limit import limiter
 
 RAW_KEY = "lw_" + "a" * 48
 KEY_RECORD = {
@@ -31,7 +31,7 @@ KEY_RECORD = {
 
 @pytest.fixture
 def client():
-    from main import app
+    from llmwatch.main import app
 
     limiter.reset()
     db = MagicMock()
@@ -39,8 +39,8 @@ def client():
     db.get_api_key_by_id.return_value = KEY_RECORD
     db.get_api_keys_by_company.return_value = [KEY_RECORD]
     with (
-        patch("services.dynamo_service.get_dynamo_service", return_value=db),
-        patch("routers.api_keys.get_dynamo_service", return_value=db),
+        patch("llmwatch.services.dynamo_service.get_dynamo_service", return_value=db),
+        patch("llmwatch.routers.api_keys.get_dynamo_service", return_value=db),
     ):
         yield TestClient(app), db
     limiter.reset()

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from services.tracing_service import AgentEvent
+from llmwatch.services.tracing_service import AgentEvent
 
 
 def _agent_executor_available() -> bool:
@@ -40,8 +40,8 @@ class TestBuildTools:
 
     def test_build_tools_all(self, monkeypatch):
         """Verify build_tools returns all 4 tools when all are requested."""
-        from config import settings
-        from services.agent_service import build_tools
+        from llmwatch.config import settings
+        from llmwatch.services.agent_service import build_tools
 
         monkeypatch.setattr(settings, "enable_code_execution", True)
         tools = build_tools(
@@ -57,7 +57,7 @@ class TestBuildTools:
 
     def test_build_tools_subset(self):
         """Verify build_tools returns only requested tools."""
-        from services.agent_service import build_tools
+        from llmwatch.services.agent_service import build_tools
 
         tools = build_tools("company-123", ["web_search"])
         assert len(tools) == 1
@@ -65,14 +65,14 @@ class TestBuildTools:
 
     def test_build_tools_empty(self):
         """Verify build_tools returns empty list for no tools."""
-        from services.agent_service import build_tools
+        from llmwatch.services.agent_service import build_tools
 
         tools = build_tools("company-123", [])
         assert tools == []
 
     def test_build_tools_ignores_unknown(self):
         """Verify build_tools silently ignores unknown tool names."""
-        from services.agent_service import build_tools
+        from llmwatch.services.agent_service import build_tools
 
         tools = build_tools("company-123", ["web_search", "nonexistent_tool"])
         assert len(tools) == 1
@@ -80,7 +80,7 @@ class TestBuildTools:
 
     def test_build_tools_db_query_is_company_scoped(self):
         """Verify the db_query tool is factory-created with the company_id."""
-        from services.agent_service import build_tools
+        from llmwatch.services.agent_service import build_tools
 
         tools_a = build_tools("company-A", ["db_query"])
         tools_b = build_tools("company-B", ["db_query"])
@@ -98,7 +98,7 @@ class TestAgentServiceGetLLM:
 
     def test_get_langchain_llm_valid_model(self):
         """Verify _get_langchain_llm returns the strategy's client for valid models."""
-        from services.agent_service import AgentService
+        from llmwatch.services.agent_service import AgentService
 
         mock_llm_service = MagicMock()
         mock_client = MagicMock()
@@ -113,7 +113,7 @@ class TestAgentServiceGetLLM:
 
     def test_get_langchain_llm_invalid_model(self):
         """Verify _get_langchain_llm raises ValueError for unknown models."""
-        from services.agent_service import AgentService
+        from llmwatch.services.agent_service import AgentService
 
         mock_llm_service = MagicMock()
         mock_llm_service.strategies = {}
@@ -134,7 +134,7 @@ class TestAgentServiceRunAgent:
     @pytest.mark.asyncio
     async def test_run_agent_yields_run_start_event(self):
         """Verify run_agent yields a run_start event as its first event."""
-        from services.agent_service import AgentService
+        from llmwatch.services.agent_service import AgentService
 
         mock_llm_service = MagicMock()
         mock_client = MagicMock()
@@ -146,8 +146,8 @@ class TestAgentServiceRunAgent:
 
         # Mock create_react_agent and AgentExecutor to avoid needing real LLM
         with (
-            patch("services.agent_service.create_react_agent"),
-            patch("services.agent_service.AgentExecutor") as MockExecutor,
+            patch("llmwatch.services.agent_service.create_react_agent"),
+            patch("llmwatch.services.agent_service.AgentExecutor") as MockExecutor,
         ):
             mock_executor_instance = MagicMock()
             # Simulate a simple agent run that returns immediately
@@ -179,7 +179,7 @@ class TestAgentServiceRunAgent:
         """Verify the run_end event content is valid JSON with summary fields."""
         import json
 
-        from services.agent_service import AgentService
+        from llmwatch.services.agent_service import AgentService
 
         mock_llm_service = MagicMock()
         mock_strategy = MagicMock()
@@ -189,8 +189,8 @@ class TestAgentServiceRunAgent:
         service = AgentService(mock_llm_service)
 
         with (
-            patch("services.agent_service.create_react_agent"),
-            patch("services.agent_service.AgentExecutor") as MockExecutor,
+            patch("llmwatch.services.agent_service.create_react_agent"),
+            patch("llmwatch.services.agent_service.AgentExecutor") as MockExecutor,
         ):
             mock_executor_instance = MagicMock()
             mock_executor_instance.invoke.return_value = {

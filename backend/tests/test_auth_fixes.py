@@ -16,9 +16,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from auth.jwt_handler import verify_password
-from exceptions import AuthenticationException, DatabaseException, ValidationException
-from models.schemas import RegisterResponse
+from llmwatch.auth.jwt_handler import verify_password
+from llmwatch.exceptions import (
+    AuthenticationException,
+    DatabaseException,
+    ValidationException,
+)
+from llmwatch.models.schemas import RegisterResponse
 
 # ── verify_password: invalid hash safety (Fix 4) ─────────────────────────
 
@@ -60,9 +64,9 @@ class TestRegisterResponse:
 
 class TestAuthenticate:
     def test_demo_mode_valid_credentials(self):
-        from routers.auth import _authenticate
+        from llmwatch.routers.auth import _authenticate
 
-        with patch("routers.auth.settings") as mock_settings:
+        with patch("llmwatch.routers.auth.settings") as mock_settings:
             mock_settings.demo_mode = True
             mock_settings.jwt_expire_hours = 24
             mock_settings.jwt_secret_key = "test-secret"
@@ -74,9 +78,9 @@ class TestAuthenticate:
 
     def test_demo_mode_invalid_credentials_raises_auth_exception(self):
         """Fix 2: Login failure raises AuthenticationException (401), not ValidationException (400)."""
-        from routers.auth import _authenticate
+        from llmwatch.routers.auth import _authenticate
 
-        with patch("routers.auth.settings") as mock_settings:
+        with patch("llmwatch.routers.auth.settings") as mock_settings:
             mock_settings.demo_mode = True
             with pytest.raises(AuthenticationException) as exc_info:
                 _authenticate("wrong@email.com", "wrongpassword")
@@ -84,9 +88,9 @@ class TestAuthenticate:
 
     def test_expires_in_derived_from_settings(self):
         """Fix 3: expires_in must reflect jwt_expire_hours, not be hardcoded."""
-        from routers.auth import _authenticate
+        from llmwatch.routers.auth import _authenticate
 
-        with patch("routers.auth.settings") as mock_settings:
+        with patch("llmwatch.routers.auth.settings") as mock_settings:
             mock_settings.demo_mode = True
             mock_settings.jwt_expire_hours = 12  # Not 24
             mock_settings.jwt_secret_key = "test-secret"
@@ -101,7 +105,7 @@ class TestAuthenticate:
 class TestSaveUser:
     def test_save_user_success(self):
         """save_user() should call put_item with ConditionExpression."""
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.users_table = MagicMock()
@@ -119,7 +123,7 @@ class TestSaveUser:
 
     def test_save_user_duplicate_email_raises_validation(self):
         """save_user() should raise ValidationException on ConditionalCheckFailed."""
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.users_table = MagicMock()
@@ -134,7 +138,7 @@ class TestSaveUser:
 
     def test_save_user_other_error_raises_database(self):
         """save_user() should raise DatabaseException for non-uniqueness errors."""
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.users_table = MagicMock()
@@ -157,7 +161,7 @@ class TestSaveUser:
 class TestLazyDynamoInit:
     def test_get_dynamo_service_creates_on_first_call(self):
         """get_dynamo_service() should lazily instantiate."""
-        import services.dynamo_service as mod
+        import llmwatch.services.dynamo_service as mod
 
         # Reset the singleton
         original = mod._dynamo_service
@@ -186,7 +190,7 @@ class TestLazyDynamoInit:
 class TestRateLimiting:
     def test_login_has_rate_limit(self):
         """The login endpoint function should have a rate limit applied."""
-        from routers.auth import login
+        from llmwatch.routers.auth import login
 
         # slowapi attaches a __rate_limit__ attribute or similar
         # The simplest check is that the function is decorated (it exists and is callable)
@@ -194,14 +198,14 @@ class TestRateLimiting:
 
     def test_register_has_rate_limit(self):
         """The register endpoint function should have a rate limit applied."""
-        from routers.auth import register
+        from llmwatch.routers.auth import register
 
         assert callable(register)
 
     def test_limiter_imported_from_rate_limit_module(self):
-        """rate_limit.py should export a Limiter instance."""
+        """llmwatch.rate_limit should export a Limiter instance."""
         from slowapi import Limiter
 
-        from rate_limit import limiter
+        from llmwatch.rate_limit import limiter
 
         assert isinstance(limiter, Limiter)

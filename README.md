@@ -160,7 +160,7 @@ llmwatch/
 │   ├── config.py          # Pydantic settings
 │   ├── exceptions.py      # Custom exception hierarchy
 │   ├── main.py            # FastAPI app entry point
-│   ├── requirements.txt
+│   ├── pyproject.toml
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
@@ -224,8 +224,8 @@ This starts three services:
 cd backend
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --port 8000
+pip install -e ".[dev]"
+llmwatch serve --port 8000
 ```
 
 **Frontend:**

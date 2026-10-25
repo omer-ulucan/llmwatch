@@ -7,21 +7,11 @@ before any application module is loaded.
 """
 
 import os
-import sys
 
 import pytest
 
 # ---------------------------------------------------------------------------
-# 1. Ensure the backend package root is on sys.path so bare imports
-#    like `from config import settings` work in tests just as they do
-#    when running the application from the backend/ directory.
-# ---------------------------------------------------------------------------
-BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BACKEND_DIR not in sys.path:
-    sys.path.insert(0, BACKEND_DIR)
-
-# ---------------------------------------------------------------------------
-# 2. Inject minimal env vars BEFORE any application module touches
+# Inject minimal env vars BEFORE any application module touches
 #    pydantic-settings.  This avoids "field required" validation errors
 #    when `config.Settings()` is instantiated at import time.
 # ---------------------------------------------------------------------------

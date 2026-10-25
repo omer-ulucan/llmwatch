@@ -2,7 +2,7 @@
 Tests for the custom exception hierarchy in exceptions.py.
 """
 
-from exceptions import (
+from llmwatch.exceptions import (
     AuthenticationException,
     AuthorizationException,
     DatabaseException,

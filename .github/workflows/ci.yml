@@ -25,9 +25,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - name: Install dependencies
-        run: pip install -r requirements.txt ruff
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install package with dev extras
+        run: pip install -e ".[dev]"
       - name: Ruff lint
         run: ruff check .
       - name: Ruff format

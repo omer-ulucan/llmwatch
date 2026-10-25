@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from auth.dependencies import get_current_user
-from auth.jwt_handler import create_access_token
-from exceptions import AuthenticationException
+from llmwatch.auth.dependencies import get_current_user
+from llmwatch.auth.jwt_handler import create_access_token
+from llmwatch.exceptions import AuthenticationException
 
 
 def _make_request(api_key: str = None) -> MagicMock:
@@ -95,7 +95,9 @@ class TestGetCurrentUserApiKey:
 
         request = _make_request(api_key=raw_key)
 
-        with patch("services.dynamo_service.get_dynamo_service") as mock_get_db:
+        with patch(
+            "llmwatch.services.dynamo_service.get_dynamo_service"
+        ) as mock_get_db:
             mock_db = MagicMock()
             mock_db.get_api_key_by_hash.return_value = mock_record
             mock_db.update_api_key_usage = MagicMock()
@@ -112,7 +114,9 @@ class TestGetCurrentUserApiKey:
             api_key="lw_nonexistentkey12345678901234567890123456789012"
         )
 
-        with patch("services.dynamo_service.get_dynamo_service") as mock_get_db:
+        with patch(
+            "llmwatch.services.dynamo_service.get_dynamo_service"
+        ) as mock_get_db:
             mock_db = MagicMock()
             mock_db.get_api_key_by_hash.return_value = None
             mock_get_db.return_value = mock_db
@@ -138,7 +142,9 @@ class TestGetCurrentUserApiKey:
 
         request = _make_request(api_key=raw_key)
 
-        with patch("services.dynamo_service.get_dynamo_service") as mock_get_db:
+        with patch(
+            "llmwatch.services.dynamo_service.get_dynamo_service"
+        ) as mock_get_db:
             mock_db = MagicMock()
             mock_db.get_api_key_by_hash.return_value = mock_record
             mock_get_db.return_value = mock_db
@@ -167,7 +173,9 @@ class TestGetCurrentUserApiKey:
         )
         request = _make_request(api_key=raw_key)
 
-        with patch("services.dynamo_service.get_dynamo_service") as mock_get_db:
+        with patch(
+            "llmwatch.services.dynamo_service.get_dynamo_service"
+        ) as mock_get_db:
             mock_db = MagicMock()
             mock_db.get_api_key_by_hash.return_value = mock_record
             mock_db.update_api_key_usage = MagicMock()

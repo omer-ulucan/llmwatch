@@ -13,8 +13,8 @@ import pytest
 from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
-from exceptions import DatabaseException
-from models.schemas import (
+from llmwatch.exceptions import DatabaseException
+from llmwatch.models.schemas import (
     ApiKeyListResponse,
     ApiKeyResponse,
     CreateApiKeyRequest,
@@ -109,7 +109,7 @@ class TestApiKeyListResponse:
 
 class TestKeyGeneration:
     def test_generate_raw_key_format(self):
-        from routers.api_keys import _generate_raw_key
+        from llmwatch.routers.api_keys import _generate_raw_key
 
         key = _generate_raw_key()
         assert key.startswith("lw_")
@@ -117,13 +117,13 @@ class TestKeyGeneration:
         assert len(key) == 51
 
     def test_generate_raw_key_unique(self):
-        from routers.api_keys import _generate_raw_key
+        from llmwatch.routers.api_keys import _generate_raw_key
 
         keys = {_generate_raw_key() for _ in range(100)}
         assert len(keys) == 100  # All unique
 
     def test_hash_key_deterministic(self):
-        from routers.api_keys import _hash_key
+        from llmwatch.routers.api_keys import _hash_key
 
         raw = "lw_test12345678901234567890123456789012345678901234"
         h1 = _hash_key(raw)
@@ -132,14 +132,14 @@ class TestKeyGeneration:
         assert len(h1) == 64  # SHA-256 hex digest
 
     def test_hash_key_matches_python_hashlib(self):
-        from routers.api_keys import _hash_key
+        from llmwatch.routers.api_keys import _hash_key
 
         raw = "lw_somekey"
         expected = hashlib.sha256(raw.encode()).hexdigest()
         assert _hash_key(raw) == expected
 
     def test_build_key_record_structure(self):
-        from routers.api_keys import _build_key_record
+        from llmwatch.routers.api_keys import _build_key_record
 
         raw = "lw_abc123def456abc123def456abc123def456abc123def456"
         record = _build_key_record(raw, "Test Key", "uid-1", "cid-1")
@@ -161,7 +161,7 @@ class TestKeyGeneration:
 
 class TestDynamoServiceApiKeys:
     def test_save_api_key_success(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -172,7 +172,7 @@ class TestDynamoServiceApiKeys:
         svc.api_keys_table.put_item.assert_called_once_with(Item=key_data)
 
     def test_save_api_key_failure_raises_database(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -183,7 +183,7 @@ class TestDynamoServiceApiKeys:
             DynamoDBService.save_api_key(svc, {"key_hash": "abc"})
 
     def test_get_api_key_by_hash_found(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -195,7 +195,7 @@ class TestDynamoServiceApiKeys:
         assert result == {"key_hash": "abc", "company_id": "c1"}
 
     def test_get_api_key_by_hash_not_found(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -205,7 +205,7 @@ class TestDynamoServiceApiKeys:
         assert result is None
 
     def test_get_api_keys_by_company(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -220,7 +220,7 @@ class TestDynamoServiceApiKeys:
         assert len(result) == 2
 
     def test_get_api_key_by_id_found_and_owned(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -234,7 +234,7 @@ class TestDynamoServiceApiKeys:
 
     def test_get_api_key_by_id_cross_tenant_rejected(self):
         """Key found but owned by different company — should return None."""
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -248,7 +248,7 @@ class TestDynamoServiceApiKeys:
         assert result is None
 
     def test_delete_api_key_success(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -260,7 +260,7 @@ class TestDynamoServiceApiKeys:
         )
 
     def test_update_api_key_usage(self):
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -275,7 +275,7 @@ class TestDynamoServiceApiKeys:
 
     def test_update_api_key_usage_failure_does_not_raise(self):
         """Usage tracking failure should be silent (logged, not re-raised)."""
-        from services.dynamo_service import DynamoDBService
+        from llmwatch.services.dynamo_service import DynamoDBService
 
         svc = MagicMock(spec=DynamoDBService)
         svc.api_keys_table = MagicMock()
@@ -298,8 +298,8 @@ class TestApiKeysRouter:
         """Create a TestClient with mocked dependencies."""
         from fastapi.testclient import TestClient
 
-        from auth.dependencies import get_session_user
-        from main import app
+        from llmwatch.auth.dependencies import get_session_user
+        from llmwatch.main import app
 
         async def mock_user():
             return {"user_id": "test-user", "company_id": "test-company"}
@@ -315,7 +315,7 @@ class TestApiKeysRouter:
     def test_create_api_key(self):
         client, app = self._get_test_client()
         try:
-            with patch("routers.api_keys.get_dynamo_service") as mock_get_db:
+            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
                 mock_db = MagicMock()
                 mock_db.save_api_key = MagicMock()
                 mock_get_db.return_value = mock_db
@@ -347,7 +347,7 @@ class TestApiKeysRouter:
     def test_list_api_keys(self):
         client, app = self._get_test_client()
         try:
-            with patch("routers.api_keys.get_dynamo_service") as mock_get_db:
+            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
                 mock_db = MagicMock()
                 mock_db.get_api_keys_by_company.return_value = [
                     {
@@ -386,7 +386,7 @@ class TestApiKeysRouter:
     def test_regenerate_api_key(self):
         client, app = self._get_test_client()
         try:
-            with patch("routers.api_keys.get_dynamo_service") as mock_get_db:
+            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
                 mock_db = MagicMock()
                 mock_db.get_api_key_by_id.return_value = {
                     "key_hash": "old_hash",
@@ -412,7 +412,7 @@ class TestApiKeysRouter:
     def test_regenerate_api_key_not_found(self):
         client, app = self._get_test_client()
         try:
-            with patch("routers.api_keys.get_dynamo_service") as mock_get_db:
+            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
                 mock_db = MagicMock()
                 mock_db.get_api_key_by_id.return_value = None
                 mock_get_db.return_value = mock_db
@@ -425,7 +425,7 @@ class TestApiKeysRouter:
     def test_revoke_api_key(self):
         client, app = self._get_test_client()
         try:
-            with patch("routers.api_keys.get_dynamo_service") as mock_get_db:
+            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
                 mock_db = MagicMock()
                 mock_db.get_api_key_by_id.return_value = {
                     "key_hash": "some_hash",
@@ -444,7 +444,7 @@ class TestApiKeysRouter:
     def test_revoke_api_key_not_found(self):
         client, app = self._get_test_client()
         try:
-            with patch("routers.api_keys.get_dynamo_service") as mock_get_db:
+            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
                 mock_db = MagicMock()
                 mock_db.get_api_key_by_id.return_value = None
                 mock_get_db.return_value = mock_db
