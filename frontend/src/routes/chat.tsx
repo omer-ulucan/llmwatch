@@ -8,6 +8,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Bot, BrainCircuit, Zap, Loader2, Clock } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import { getErrorMessage } from '@/api/errors';
 import * as Switch from '@radix-ui/react-switch';
 
 interface Message {
@@ -56,9 +57,9 @@ const Chat: React.FC = () => {
         latency: res.data.latency_ms
       };
       setMessages(prev => [...prev, aiMessage]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      const detail = err?.response?.data?.error || err?.message || 'Connection to LLM routing engine failed.';
+      const detail = getErrorMessage(err, 'Connection to LLM routing engine failed.');
       setMessages(prev => [...prev, { id: 'error', role: 'assistant', content: `Error: ${detail}` }]);
     } finally {
       setIsLoading(false);

@@ -1028,7 +1028,7 @@ data: {"run_id":"abc-123","step_index":3,"event_type":"tool_result","content":"1
 
 data: {"run_id":"abc-123","step_index":6,"event_type":"final_answer","content":"The factorial of 15 is 1,307,674,368,000...","timestamp":"2026-03-07T12:00:05Z"}
 
-data: {"run_id":"abc-123","step_index":7,"event_type":"run_end","content":"{\"run_id\":\"abc-123\",\"total_steps\":7,\"total_latency_ms\":5200,\"total_tokens\":380,\"total_cost_usd\":0.0015,\"tools_used\":[\"execute_python\",\"web_search\"],\"model_used\":\"gemini\",\"success\":true}","timestamp":"2026-03-07T12:00:05Z"}`}
+data: {"run_id":"abc-123","step_index":7,"event_type":"run_end","content":"{\\"run_id\\":\\"abc-123\\",\\"total_steps\\":7,\\"total_latency_ms\\":5200,\\"total_tokens\\":380,\\"total_cost_usd\\":0.0015,\\"tools_used\\":[\\"execute_python\\",\\"web_search\\"],\\"model_used\\":\\"gemini\\",\\"success\\":true}","timestamp":"2026-03-07T12:00:05Z"}`}
           </CodeBlock>
 
           {/* Available Tools */}

@@ -8,6 +8,7 @@ import { useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { LogIn, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import { getErrorMessage } from '@/api/errors';
 import { useStore } from '@/store/useStore';
 
 const Login: React.FC = () => {
@@ -28,8 +29,8 @@ const Login: React.FC = () => {
       const response = await apiClient.post('/auth/login', { email, password });
       setAuth(response.data.access_token);
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Authentication failed');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Authentication failed'));
     } finally {
       setIsLoading(false);
     }

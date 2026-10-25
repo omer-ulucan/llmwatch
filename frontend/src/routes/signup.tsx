@@ -9,6 +9,7 @@ import { useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { UserPlus, Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import { getErrorMessage } from '@/api/errors';
 
 const Signup: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
@@ -50,8 +51,8 @@ const Signup: React.FC = () => {
       setSuccess(true);
       // Redirect to login after a short delay so the user sees the success message
       setTimeout(() => navigate('/login'), 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setIsLoading(false);
     }
