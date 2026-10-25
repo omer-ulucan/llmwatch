@@ -9,13 +9,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from config import logger, settings
 from exceptions import LLMWatchException
 from middleware.security import setup_security_middleware
-from rate_limit import limiter
+from rate_limit import limiter, rate_limit_exceeded_handler
 from routers import agent, analytics, api_keys, auth, chat
 
 # WHY: We apply slowapi rate limiters at the application layer to block abuse
@@ -45,7 +44,7 @@ app = FastAPI(
 
 # Apply limits globally
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Setup fundamental HTTP security guards
 setup_security_middleware(app)

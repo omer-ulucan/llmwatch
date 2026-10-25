@@ -12,6 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from auth.dependencies import get_current_user
 from config import logger
 from models.schemas import ChatCompletionRequest, ChatCompletionResponse
+from rate_limit import chat_limit, ip_key, limiter, per_ip_limit, rate_limit_key
 from services.dynamo_service import get_dynamo_service
 from services.llm_service import get_llm_service
 from services.mlflow_service import get_mlflow_service
@@ -20,6 +21,8 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 @router.post("/completions", response_model=ChatCompletionResponse)
+@limiter.limit(chat_limit, key_func=rate_limit_key)
+@limiter.limit(per_ip_limit, key_func=ip_key)
 async def chat_completions(
     request: Request,
     data: ChatCompletionRequest,

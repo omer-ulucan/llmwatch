@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from auth.dependencies import get_current_user
 from config import logger
 from models.schemas import AgentRunRequest
+from rate_limit import agent_limit, ip_key, limiter, per_ip_limit, rate_limit_key
 from services.agent_service import get_agent_service
 from services.dynamo_service import get_dynamo_service
 from services.mlflow_service import get_mlflow_service
@@ -36,6 +37,8 @@ def _decimal_default(obj: Any) -> Any:
 
 
 @router.post("/run")
+@limiter.limit(agent_limit, key_func=rate_limit_key)
+@limiter.limit(per_ip_limit, key_func=ip_key)
 async def run_agent(
     request: Request,
     data: AgentRunRequest,

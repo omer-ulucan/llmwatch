@@ -50,6 +50,20 @@ class Settings(BaseSettings):
     # default and refused when APP_ENV=production (see _refuse_demo_in_production).
     demo_mode: bool = False
 
+    # Rate limiting
+    # WHY: Comma-separated CIDRs of reverse proxies whose X-Forwarded-For header is
+    # trusted. Leave empty when the backend is reached directly; set it to the proxy
+    # network when running behind nginx (otherwise every user shares one bucket).
+    trusted_proxies: str = ""
+    rate_limit_enabled: bool = True
+    # memory:// is per process; use e.g. redis://host:6379 with several workers.
+    rate_limit_storage_uri: str = "memory://"
+    # Per API key / per user (slowapi syntax, e.g. "60/minute;1000/day")
+    rate_limit_chat: str = "60/minute"
+    rate_limit_agent: str = "10/minute"
+    # Per client IP on the same routes, across all identities from that address
+    rate_limit_per_ip: str = "300/minute"
+
     # Agent Python code execution
     # WHY: The python tool runs model-written code as a subprocess of the backend. It
     # is NOT a sandbox: it shares the container's filesystem and network. Keep it off
