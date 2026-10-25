@@ -11,7 +11,7 @@ LLMWatch is a full-stack LLMOps platform for monitoring, orchestrating, and secu
 - **Real-Time Analytics Dashboard** -- Track cost, latency, request volume, and error rates across all models with live-updating charts.
 - **Agent Trace Viewer** -- Full execution trace storage in DynamoDB with timeline visualization, tool usage breakdown, and per-step latency metrics.
 - **API Key Management** -- Create, list, regenerate, and revoke API keys for programmatic access. Per-key usage tracking (request count, last used). Keys are SHA-256 hashed at rest.
-- **Dual Authentication** -- All protected endpoints accept either JWT Bearer token (browser login) or `X-API-Key` header (programmatic access).
+- **Dual Authentication** -- Protected endpoints accept either a JWT Bearer token (browser login) or an `X-API-Key` header (programmatic access). Managing API keys themselves requires a browser session.
 - **MLFlow Integration** -- Every LLM call is logged to MLFlow for experiment tracking, model comparison, and metric aggregation.
 - **Multi-Tenant Security** -- JWT authentication with company-scoped data isolation. All DynamoDB queries are partitioned by `company_id`.
 - **Reasoning Mode** -- Enable deep thinking mode to see the LLM's chain-of-thought reasoning traces alongside responses.
@@ -69,7 +69,7 @@ LLMWatch is a full-stack LLMOps platform for monitoring, orchestrating, and secu
 
 ## Programmatic Access (API Keys)
 
-API keys enable programmatic access without browser login. Create a key from the Settings page, then use the `X-API-Key` header with any endpoint.
+API keys enable programmatic access without browser login. Create a key from the Settings page, then use the `X-API-Key` header with any endpoint except API key management (`/api-keys`), which requires a signed-in session so a leaked key can't mint or revoke keys.
 
 ### Chat Completion
 ```bash

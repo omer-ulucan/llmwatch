@@ -298,13 +298,14 @@ class TestApiKeysRouter:
         """Create a TestClient with mocked dependencies."""
         from fastapi.testclient import TestClient
 
-        from auth.dependencies import get_current_user
+        from auth.dependencies import get_session_user
         from main import app
 
         async def mock_user():
             return {"user_id": "test-user", "company_id": "test-company"}
 
-        app.dependency_overrides[get_current_user] = mock_user
+        # Key management requires a session (JWT), so that's the dependency to stub.
+        app.dependency_overrides[get_session_user] = mock_user
         client = TestClient(app)
         return client, app
 

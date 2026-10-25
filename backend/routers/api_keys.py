@@ -14,7 +14,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Request
 
-from auth.dependencies import get_current_user
+from auth.dependencies import get_session_user
 from config import logger
 from exceptions import ResourceNotFoundException
 from models.schemas import (
@@ -81,7 +81,7 @@ def _build_key_record(
 async def create_api_key(
     request: Request,
     body: CreateApiKeyRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_session_user),
 ):
     """
     Creates a new API key for programmatic access.
@@ -117,7 +117,7 @@ async def create_api_key(
 @limiter.limit("30/minute")
 async def list_api_keys(
     request: Request,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_session_user),
 ):
     """
     Returns all API keys for the authenticated user's company.
@@ -152,7 +152,7 @@ async def list_api_keys(
 async def regenerate_api_key(
     request: Request,
     key_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_session_user),
 ):
     """
     Revokes the old key and issues a new one with the same name.
@@ -199,7 +199,7 @@ async def regenerate_api_key(
 async def revoke_api_key(
     request: Request,
     key_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_session_user),
 ):
     """
     Permanently revokes (hard-deletes) an API key.

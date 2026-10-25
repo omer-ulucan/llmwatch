@@ -16,7 +16,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from auth.jwt_handler import decode_access_token
 from config import logger
-from exceptions import AuthenticationException
+from exceptions import AuthenticationException, AuthorizationException
 
 # WHY: OAuth2PasswordBearer automatically looks for the Authorization: Bearer <token> header
 # and integrates directly with FastAPI's OpenAPI swagger documentation standard.
@@ -99,6 +99,10 @@ async def get_current_user(
         return await _authenticate_via_api_key(api_key)
 
     # Fall back to JWT Bearer token
+    return _authenticate_via_jwt(token)
+
+
+def _authenticate_via_jwt(token: Optional[str]) -> Dict[str, Any]:
     if not token:
         raise AuthenticationException("Not authenticated")
 
@@ -110,3 +114,24 @@ async def get_current_user(
         raise AuthenticationException("Invalid token payload structure")
 
     return {"user_id": str(user_id), "company_id": str(company_id)}
+
+
+async def get_session_user(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+) -> Dict[str, Any]:
+    """
+    Like get_current_user, but only accepts a browser session (JWT).
+    WHY: Used for credential management. If API keys could create, rotate or delete
+    API keys, one leaked key could mint replacements and revoke the owner's keys,
+    keeping access after the leak is noticed.
+
+    Raises:
+        AuthorizationException: If the request carries an X-API-Key header.
+        AuthenticationException: If there is no valid JWT.
+    """
+    if request.headers.get("X-API-Key"):
+        raise AuthorizationException(
+            "API keys cannot manage API keys; sign in to the dashboard instead"
+        )
+    return _authenticate_via_jwt(token)
