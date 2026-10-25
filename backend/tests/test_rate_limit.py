@@ -11,7 +11,6 @@ import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from llmwatch.auth.jwt_handler import create_access_token
@@ -127,8 +126,13 @@ def test_anonymous_requests_are_keyed_by_client_ip(trusted_proxies):
 
 
 @pytest.fixture
-def chat_app(monkeypatch, trusted_proxies):
-    """The real app with the LLM and persistence layers stubbed out."""
+async def proxied(app_db, trusted_proxies, monkeypatch):
+    """The real app behind "nginx": every request comes from the proxy address.
+
+    The LLM and persistence layers are stubbed out; auth uses the test database.
+    """
+    import httpx
+
     from llmwatch.main import app
 
     llm = MagicMock()
@@ -147,52 +151,55 @@ def chat_app(monkeypatch, trusted_proxies):
     monkeypatch.setattr(settings, "rate_limit_chat", "2/minute")
     monkeypatch.setattr(settings, "rate_limit_per_ip", "1000/minute")
     limiter.reset()
+    transport = httpx.ASGITransport(app=app, client=("172.18.0.5", 50000))
     with (
         patch("llmwatch.routers.chat.get_llm_service", return_value=llm),
         patch("llmwatch.routers.chat.get_dynamo_service"),
         patch("llmwatch.routers.chat.get_mlflow_service"),
     ):
-        # Requests arrive from nginx (a trusted proxy) for every user.
-        yield TestClient(app, client=("172.18.0.5", 50000))
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            yield c
     limiter.reset()
 
 
-def _chat(client: TestClient, user: str, ip: str = "198.51.100.7"):
-    token = create_access_token({"sub": user, "company_id": "c1"})
-    return client.post(
+async def _chat(client, account, ip: str = "198.51.100.7"):
+    return await client.post(
         "/chat/completions",
         json={"prompt": "hello", "model": "gemini"},
-        headers={"Authorization": f"Bearer {token}", "X-Forwarded-For": ip},
+        headers={**account.headers, "X-Forwarded-For": ip},
     )
 
 
-def test_chat_completions_is_rate_limited(chat_app):
-    assert _chat(chat_app, "alice").status_code == 200
-    assert _chat(chat_app, "alice").status_code == 200
-    resp = _chat(chat_app, "alice")
-    assert resp.status_code == 429
+async def test_chat_completions_is_rate_limited(proxied, make_account):
+    alice = await make_account()
+    assert (await _chat(proxied, alice)).status_code == 200
+    assert (await _chat(proxied, alice)).status_code == 200
+    assert (await _chat(proxied, alice)).status_code == 429
 
 
-def test_users_behind_the_same_proxy_have_separate_buckets(chat_app):
+async def test_users_behind_the_same_proxy_have_separate_buckets(proxied, make_account):
     """Regression: all users used to share the proxy's IP bucket."""
+    alice = await make_account()
+    bob = await make_account()
     for _ in range(2):
-        assert _chat(chat_app, "alice", ip="198.51.100.7").status_code == 200
-    assert _chat(chat_app, "alice", ip="198.51.100.7").status_code == 429
+        assert (await _chat(proxied, alice, ip="198.51.100.7")).status_code == 200
+    assert (await _chat(proxied, alice, ip="198.51.100.7")).status_code == 429
     # Bob, a different user from a different address behind the same nginx.
-    assert _chat(chat_app, "bob", ip="198.51.100.8").status_code == 200
+    assert (await _chat(proxied, bob, ip="198.51.100.8")).status_code == 200
 
 
-def test_per_ip_limit_still_applies_across_identities(chat_app, monkeypatch):
+async def test_per_ip_limit_still_applies_across_identities(
+    proxied, make_account, monkeypatch
+):
     """Rotating API keys or accounts from one address doesn't escape the IP cap."""
     monkeypatch.setattr(settings, "rate_limit_chat", "100/minute")
     monkeypatch.setattr(settings, "rate_limit_per_ip", "3/minute")
-    statuses = [_chat(chat_app, f"user-{i}").status_code for i in range(4)]
+    users = [await make_account() for _ in range(4)]
+    statuses = [(await _chat(proxied, u)).status_code for u in users]
     assert statuses == [200, 200, 200, 429]
 
 
-def test_agent_run_is_rate_limited(monkeypatch, trusted_proxies):
-    from llmwatch.main import app
-
+async def test_agent_run_is_rate_limited(client, make_account, monkeypatch):
     async def fake_run_agent(**kwargs):
         if False:
             yield None
@@ -200,25 +207,24 @@ def test_agent_run_is_rate_limited(monkeypatch, trusted_proxies):
     agent = MagicMock()
     agent.run_agent = fake_run_agent
     monkeypatch.setattr(settings, "rate_limit_agent", "1/minute")
-    limiter.reset()
-    token = create_access_token({"sub": "alice", "company_id": "c1"})
-    headers = {"Authorization": f"Bearer {token}"}
+    alice = await make_account()
     body = {"prompt": "hi", "model": "gemini", "tools": []}
     with (
         patch("llmwatch.routers.agent.get_agent_service", return_value=agent),
         patch("llmwatch.routers.agent.get_dynamo_service"),
         patch("llmwatch.routers.agent.get_mlflow_service"),
     ):
-        client = TestClient(app)
-        assert client.post("/agent/run", json=body, headers=headers).status_code == 200
-        assert client.post("/agent/run", json=body, headers=headers).status_code == 429
-    limiter.reset()
+        first = await client.post("/agent/run", json=body, headers=alice.headers)
+        second = await client.post("/agent/run", json=body, headers=alice.headers)
+    assert first.status_code == 200
+    assert second.status_code == 429
 
 
-def test_rate_limit_response_uses_error_envelope(chat_app):
+async def test_rate_limit_response_uses_error_envelope(proxied, make_account):
+    carol = await make_account()
     for _ in range(2):
-        _chat(chat_app, "carol")
-    resp = _chat(chat_app, "carol")
+        await _chat(proxied, carol)
+    resp = await _chat(proxied, carol)
     assert resp.status_code == 429
     assert resp.json()["code"] == "RATE_LIMITED"
     assert resp.headers["retry-after"] == "60"  # window of the 2/minute limit

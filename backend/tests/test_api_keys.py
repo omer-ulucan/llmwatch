@@ -7,7 +7,7 @@ Tests for the API key management feature:
 """
 
 import hashlib
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from botocore.exceptions import ClientError
@@ -138,22 +138,16 @@ class TestKeyGeneration:
         expected = hashlib.sha256(raw.encode()).hexdigest()
         assert _hash_key(raw) == expected
 
-    def test_build_key_record_structure(self):
-        from llmwatch.routers.api_keys import _build_key_record
+    def test_new_key_structure(self):
+        from llmwatch.routers.api_keys import _new_key
 
         raw = "lw_abc123def456abc123def456abc123def456abc123def456"
-        record = _build_key_record(raw, "Test Key", "uid-1", "cid-1")
+        key = _new_key(raw, "Test Key", "uid-1")
 
-        assert record["key_hash"] == hashlib.sha256(raw.encode()).hexdigest()
-        assert record["company_id"] == "cid-1"
-        assert record["user_id"] == "uid-1"
-        assert record["name"] == "Test Key"
-        assert record["prefix"] == "lw_abc123d..."
-        assert record["request_count"] == 0
-        assert record["is_active"] is True
-        assert record["last_used_at"] is None
-        assert "key_id" in record
-        assert "created_at" in record
+        assert key.key_hash == hashlib.sha256(raw.encode()).hexdigest()
+        assert key.user_id == "uid-1"
+        assert key.name == "Test Key"
+        assert key.prefix == "lw_abc123d..."
 
 
 # ── DynamoDB Service Method Tests ─────────────────────────────────────────
@@ -288,168 +282,132 @@ class TestDynamoServiceApiKeys:
         DynamoDBService.update_api_key_usage(svc, "hash123")
 
 
-# ── Router Endpoint Tests ─────────────────────────────────────────────────
+# ── Router Endpoint Tests (SQL) ───────────────────────────────────────────
 
 
 class TestApiKeysRouter:
-    """Tests for the API keys router endpoints using FastAPI TestClient."""
+    """The /api-keys endpoints against the real database layer."""
 
-    def _get_test_client(self):
-        """Create a TestClient with mocked dependencies."""
-        from fastapi.testclient import TestClient
+    async def test_create_api_key(self, client, make_account):
+        owner = await make_account()
+        response = await client.post(
+            "/api-keys", json={"name": "Production Key"}, headers=owner.headers
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Production Key"
+        assert data["raw_key"].startswith("lw_")
+        assert len(data["raw_key"]) == 51
+        assert data["prefix"] == data["raw_key"][:10] + "..."
 
-        from llmwatch.auth.dependencies import get_session_user
-        from llmwatch.main import app
+    async def test_raw_key_is_not_stored(self, client, make_account, db_session):
+        from sqlalchemy import select
 
-        async def mock_user():
-            return {"user_id": "test-user", "company_id": "test-company"}
+        from llmwatch.db.models import ApiKey
 
-        # Key management requires a session (JWT), so that's the dependency to stub.
-        app.dependency_overrides[get_session_user] = mock_user
-        client = TestClient(app)
-        return client, app
+        owner = await make_account()
+        raw = (
+            await client.post("/api-keys", json={"name": "k"}, headers=owner.headers)
+        ).json()["raw_key"]
 
-    def _cleanup(self, app):
-        app.dependency_overrides.clear()
+        stored = (await db_session.execute(select(ApiKey))).scalar_one()
+        assert stored.key_hash == hashlib.sha256(raw.encode()).hexdigest()
+        assert raw not in {stored.key_hash, stored.prefix, stored.name}
 
-    def test_create_api_key(self):
-        client, app = self._get_test_client()
-        try:
-            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
-                mock_db = MagicMock()
-                mock_db.save_api_key = MagicMock()
-                mock_get_db.return_value = mock_db
+    async def test_create_api_key_empty_name_rejected(self, client, make_account):
+        owner = await make_account()
+        response = await client.post(
+            "/api-keys", json={"name": ""}, headers=owner.headers
+        )
+        assert response.status_code == 422
 
-                response = client.post(
-                    "/api-keys",
-                    json={"name": "Production Key"},
-                )
-                assert response.status_code == 201
-                data = response.json()
-                assert data["name"] == "Production Key"
-                assert data["raw_key"].startswith("lw_")
-                assert len(data["raw_key"]) == 51
-                assert "key_id" in data
-                assert "prefix" in data
-                assert "created_at" in data
-                mock_db.save_api_key.assert_called_once()
-        finally:
-            self._cleanup(app)
+    async def test_list_api_keys(self, client, make_account):
+        owner = await make_account()
+        for name in ("one", "two"):
+            await client.post("/api-keys", json={"name": name}, headers=owner.headers)
 
-    def test_create_api_key_empty_name_rejected(self):
-        client, app = self._get_test_client()
-        try:
-            response = client.post("/api-keys", json={"name": ""})
-            assert response.status_code == 422  # Validation error
-        finally:
-            self._cleanup(app)
+        response = await client.get("/api-keys", headers=owner.headers)
+        assert response.status_code == 200
+        keys = response.json()["keys"]
+        assert sorted(k["name"] for k in keys) == ["one", "two"]
+        for k in keys:
+            assert "raw_key" not in k
+            assert k["request_count"] == 0
+            assert k["last_used_at"] is None
 
-    def test_list_api_keys(self):
-        client, app = self._get_test_client()
-        try:
-            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
-                mock_db = MagicMock()
-                mock_db.get_api_keys_by_company.return_value = [
-                    {
-                        "key_id": "kid-1",
-                        "name": "Key One",
-                        "prefix": "lw_abc1...",
-                        "created_at": "2026-01-01T00:00:00+00:00",
-                        "last_used_at": None,
-                        "request_count": 0,
-                        "is_active": True,
-                    },
-                    {
-                        "key_id": "kid-2",
-                        "name": "Key Two",
-                        "prefix": "lw_def2...",
-                        "created_at": "2026-02-01T00:00:00+00:00",
-                        "last_used_at": "2026-03-01T00:00:00+00:00",
-                        "request_count": 15,
-                        "is_active": True,
-                    },
-                ]
-                mock_get_db.return_value = mock_db
+    async def test_list_only_shows_own_workspace(self, client, make_account):
+        alice = await make_account(workspace="A")
+        bob = await make_account(workspace="B")
+        await client.post("/api-keys", json={"name": "alice"}, headers=alice.headers)
 
-                response = client.get("/api-keys")
-                assert response.status_code == 200
-                data = response.json()
-                assert len(data["keys"]) == 2
-                assert data["keys"][0]["name"] == "Key One"
-                assert data["keys"][1]["request_count"] == 15
-                # Ensure raw_key is NOT in the list response
-                for key in data["keys"]:
-                    assert "raw_key" not in key
-        finally:
-            self._cleanup(app)
+        response = await client.get("/api-keys", headers=bob.headers)
+        assert response.json()["keys"] == []
 
-    def test_regenerate_api_key(self):
-        client, app = self._get_test_client()
-        try:
-            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
-                mock_db = MagicMock()
-                mock_db.get_api_key_by_id.return_value = {
-                    "key_hash": "old_hash",
-                    "key_id": "kid-1",
-                    "name": "My Key",
-                    "company_id": "test-company",
-                }
-                mock_db.delete_api_key = MagicMock()
-                mock_db.save_api_key = MagicMock()
-                mock_get_db.return_value = mock_db
+    async def test_regenerate_api_key(self, client, make_account):
+        owner = await make_account()
+        old = (
+            await client.post("/api-keys", json={"name": "CI"}, headers=owner.headers)
+        ).json()
 
-                response = client.post("/api-keys/kid-1/regenerate")
-                assert response.status_code == 200
-                data = response.json()
-                assert data["name"] == "My Key"
-                assert data["raw_key"].startswith("lw_")
-                assert data["key_id"] != "kid-1"  # New key_id
-                mock_db.delete_api_key.assert_called_once_with("old_hash")
-                mock_db.save_api_key.assert_called_once()
-        finally:
-            self._cleanup(app)
+        response = await client.post(
+            f"/api-keys/{old['key_id']}/regenerate", headers=owner.headers
+        )
+        assert response.status_code == 200
+        new = response.json()
+        assert new["name"] == "CI"
+        assert new["raw_key"] != old["raw_key"]
+        assert new["key_id"] != old["key_id"]
 
-    def test_regenerate_api_key_not_found(self):
-        client, app = self._get_test_client()
-        try:
-            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
-                mock_db = MagicMock()
-                mock_db.get_api_key_by_id.return_value = None
-                mock_get_db.return_value = mock_db
+        # Old key no longer authenticates; the new one does.
+        assert (
+            await client.get("/auth/me", headers={"X-API-Key": old["raw_key"]})
+        ).status_code == 401
+        assert (
+            await client.get("/auth/me", headers={"X-API-Key": new["raw_key"]})
+        ).status_code == 200
 
-                response = client.post("/api-keys/nonexistent/regenerate")
-                assert response.status_code == 404
-        finally:
-            self._cleanup(app)
+    async def test_regenerate_api_key_not_found(self, client, make_account):
+        owner = await make_account()
+        response = await client.post(
+            "/api-keys/nonexistent-id/regenerate", headers=owner.headers
+        )
+        assert response.status_code == 404
 
-    def test_revoke_api_key(self):
-        client, app = self._get_test_client()
-        try:
-            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
-                mock_db = MagicMock()
-                mock_db.get_api_key_by_id.return_value = {
-                    "key_hash": "some_hash",
-                    "key_id": "kid-1",
-                    "company_id": "test-company",
-                }
-                mock_db.delete_api_key = MagicMock()
-                mock_get_db.return_value = mock_db
+    async def test_revoke_api_key(self, client, make_account):
+        owner = await make_account()
+        created = (
+            await client.post("/api-keys", json={"name": "k"}, headers=owner.headers)
+        ).json()
 
-                response = client.delete("/api-keys/kid-1")
-                assert response.status_code == 204
-                mock_db.delete_api_key.assert_called_once_with("some_hash")
-        finally:
-            self._cleanup(app)
+        response = await client.delete(
+            f"/api-keys/{created['key_id']}", headers=owner.headers
+        )
+        assert response.status_code == 204
+        assert (
+            await client.get("/auth/me", headers={"X-API-Key": created["raw_key"]})
+        ).status_code == 401
 
-    def test_revoke_api_key_not_found(self):
-        client, app = self._get_test_client()
-        try:
-            with patch("llmwatch.routers.api_keys.get_dynamo_service") as mock_get_db:
-                mock_db = MagicMock()
-                mock_db.get_api_key_by_id.return_value = None
-                mock_get_db.return_value = mock_db
+    async def test_revoke_api_key_not_found(self, client, make_account):
+        owner = await make_account()
+        response = await client.delete(
+            "/api-keys/nonexistent-id", headers=owner.headers
+        )
+        assert response.status_code == 404
 
-                response = client.delete("/api-keys/nonexistent")
-                assert response.status_code == 404
-        finally:
-            self._cleanup(app)
+    async def test_cannot_touch_another_workspaces_key(self, client, make_account):
+        alice = await make_account(workspace="A")
+        bob = await make_account(workspace="B")
+        key = (
+            await client.post("/api-keys", json={"name": "a"}, headers=alice.headers)
+        ).json()
+
+        for method, path in [
+            ("post", f"/api-keys/{key['key_id']}/regenerate"),
+            ("delete", f"/api-keys/{key['key_id']}"),
+        ]:
+            resp = await client.request(method, path, headers=bob.headers)
+            assert resp.status_code == 404
+        # Alice's key still works.
+        assert (
+            await client.get("/auth/me", headers={"X-API-Key": key["raw_key"]})
+        ).status_code == 200

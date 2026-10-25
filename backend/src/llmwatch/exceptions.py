@@ -50,6 +50,13 @@ class ResourceNotFoundException(LLMWatchException):
         super().__init__(message, code="RESOURCE_NOT_FOUND")
 
 
+class ConflictException(LLMWatchException):
+    """Raised when a request conflicts with existing state (e.g. duplicate email)."""
+
+    def __init__(self, message: str):
+        super().__init__(message, code="CONFLICT")
+
+
 class LLMServiceException(LLMWatchException):
     """Raised when interactions with external LLM APIs fail."""
 

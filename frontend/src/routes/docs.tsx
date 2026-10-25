@@ -552,8 +552,8 @@ npm run dev   # → http://localhost:5173`}
             <h4 className="font-semibold mb-3">Demo credentials</h4>
             <ParamTable
               params={[
-                { name: 'email', type: 'string', required: true, description: 'admin@company.com' },
-                { name: 'password', type: 'string', required: true, description: 'admin123' },
+                { name: 'email', type: 'string', required: true, description: 'demo@llmwatch.dev (demo mode)' },
+                { name: 'password', type: 'string', required: true, description: 'llmwatch-demo (demo mode)' },
               ]}
             />
             <p className="text-xs text-muted-foreground mt-2">
@@ -683,8 +683,8 @@ npm run dev   # → http://localhost:5173`}
 {`curl -X POST http://localhost:8000/auth/login \\
   -H "Content-Type: application/json" \\
   -d '{
-    "email": "admin@company.com",
-    "password": "admin123"
+    "email": "demo@llmwatch.dev",
+    "password": "llmwatch-demo"
   }'`}
           </CodeBlock>
 

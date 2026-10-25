@@ -14,12 +14,13 @@ from slowapi.errors import RateLimitExceeded
 
 from llmwatch.config import logger, settings
 from llmwatch.db import migrate
-from llmwatch.db.engine import dispose_engine, is_memory_sqlite
+from llmwatch.db.engine import dispose_engine, get_sessionmaker, is_memory_sqlite
 from llmwatch.exceptions import LLMWatchException
 from llmwatch.middleware.security import setup_security_middleware
 from llmwatch.rate_limit import limiter, rate_limit_exceeded_handler
-from llmwatch.routers import agent, analytics, api_keys, auth, chat
+from llmwatch.routers import agent, analytics, api_keys, auth, chat, workspaces
 from llmwatch.security.secrets import server_secret
+from llmwatch.services.accounts import ensure_demo_account
 
 # WHY: We apply slowapi rate limiters at the application layer to block abuse
 
@@ -36,6 +37,9 @@ async def lifespan(app: FastAPI):
     # Fail fast on a bad secret, and create the generated one before serving.
     server_secret()
     await run_startup_migrations()
+    if settings.demo_mode:
+        async with get_sessionmaker()() as session:
+            await ensure_demo_account(session)
     logger.info(
         f"LLMWatch {settings.app_version} startup complete in environment: {settings.app_env}"
     )
@@ -83,6 +87,8 @@ async def custom_exception_handler(request: Request, exc: LLMWatchException):
         status_code = 403
     elif exc.code == "RESOURCE_NOT_FOUND":
         status_code = 404
+    elif exc.code == "CONFLICT":
+        status_code = 409
 
     return JSONResponse(
         status_code=status_code, content={"error": exc.message, "code": exc.code}
@@ -108,6 +114,7 @@ app.include_router(chat.router)
 app.include_router(analytics.router)
 app.include_router(agent.router)
 app.include_router(api_keys.router)
+app.include_router(workspaces.router)
 
 
 @app.get("/health", tags=["Health"])

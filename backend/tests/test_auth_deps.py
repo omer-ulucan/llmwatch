@@ -1,186 +1,158 @@
 """
 Tests for the auth dependency (get_current_user) in auth/dependencies.py.
-WHY: Covers both JWT and API key authentication paths.
+WHY: Covers both JWT and API key authentication paths against the real database.
 """
 
-from unittest.mock import MagicMock, patch
+from datetime import timedelta
 
 import pytest
+from sqlalchemy import select
 
-from llmwatch.auth.dependencies import get_current_user
 from llmwatch.auth.jwt_handler import create_access_token
-from llmwatch.exceptions import AuthenticationException
+from llmwatch.db.models import ApiKey, User
 
 
-def _make_request(api_key: str = None) -> MagicMock:
-    """Create a mock FastAPI Request with optional X-API-Key header."""
-    request = MagicMock()
-    headers = {}
-    if api_key:
-        headers["X-API-Key"] = api_key
-    request.headers = headers
-    return request
+async def _api_key(client, account) -> dict:
+    resp = await client.post("/api-keys", json={"name": "k"}, headers=account.headers)
+    assert resp.status_code == 201
+    return resp.json()
 
 
-class TestGetCurrentUserJWT:
-    """Tests for JWT Bearer token authentication path."""
+class TestJWT:
+    async def test_valid_token_returns_user_context(self, client, make_account):
+        acct = await make_account(email="alice@example.com", workspace="Acme")
+        resp = await client.get("/auth/me", headers=acct.headers)
 
-    @pytest.mark.asyncio
-    async def test_valid_token_returns_user_dict(self):
-        token = create_access_token(data={"sub": "user-1", "company_id": "comp-1"})
-        request = _make_request()
-        result = await get_current_user(request=request, token=token)
-        assert result == {"user_id": "user-1", "company_id": "comp-1"}
-
-    @pytest.mark.asyncio
-    async def test_missing_sub_raises(self):
-        token = create_access_token(data={"company_id": "comp-1"})
-        request = _make_request()
-        with pytest.raises(AuthenticationException) as exc_info:
-            await get_current_user(request=request, token=token)
-        assert (
-            "payload" in exc_info.value.message.lower()
-            or "Invalid" in exc_info.value.message
-        )
-
-    @pytest.mark.asyncio
-    async def test_missing_company_id_raises(self):
-        token = create_access_token(data={"sub": "user-1"})
-        request = _make_request()
-        with pytest.raises(AuthenticationException) as exc_info:
-            await get_current_user(request=request, token=token)
-        assert (
-            "payload" in exc_info.value.message.lower()
-            or "Invalid" in exc_info.value.message
-        )
-
-    @pytest.mark.asyncio
-    async def test_invalid_token_raises(self):
-        request = _make_request()
-        with pytest.raises(AuthenticationException):
-            await get_current_user(request=request, token="garbage-token")
-
-    @pytest.mark.asyncio
-    async def test_empty_token_raises(self):
-        request = _make_request()
-        with pytest.raises(AuthenticationException):
-            await get_current_user(request=request, token="")
-
-    @pytest.mark.asyncio
-    async def test_no_token_no_api_key_raises(self):
-        """Neither auth method provided should raise."""
-        request = _make_request()
-        with pytest.raises(AuthenticationException, match="Not authenticated"):
-            await get_current_user(request=request, token=None)
-
-
-class TestGetCurrentUserApiKey:
-    """Tests for X-API-Key header authentication path."""
-
-    @pytest.mark.asyncio
-    async def test_valid_api_key_returns_user_dict(self):
-        """A valid API key should return user context from DynamoDB."""
-        import hashlib
-
-        raw_key = "lw_abc123def456abc123def456abc123def456abc123def456"
-        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-
-        mock_record = {
-            "key_hash": key_hash,
-            "key_id": "kid-1",
-            "user_id": "user-api",
-            "company_id": "comp-api",
-            "is_active": True,
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["user"] == {
+            "id": acct.user_id,
+            "email": "alice@example.com",
+            "role": "owner",
         }
+        assert body["workspace"]["id"] == acct.workspace_id
+        assert body["workspace"]["name"] == "Acme"
+        assert body["auth_method"] == "jwt"
 
-        request = _make_request(api_key=raw_key)
+    async def test_missing_token_is_401(self, client):
+        resp = await client.get("/auth/me")
+        assert resp.status_code == 401
+        assert resp.json()["code"] == "AUTHENTICATION_FAILED"
 
-        with patch(
-            "llmwatch.services.dynamo_service.get_dynamo_service"
-        ) as mock_get_db:
-            mock_db = MagicMock()
-            mock_db.get_api_key_by_hash.return_value = mock_record
-            mock_db.update_api_key_usage = MagicMock()
-            mock_get_db.return_value = mock_db
+    async def test_garbage_token_is_401(self, client):
+        resp = await client.get("/auth/me", headers={"Authorization": "Bearer junk"})
+        assert resp.status_code == 401
 
-            result = await get_current_user(request=request, token=None)
-            assert result == {"user_id": "user-api", "company_id": "comp-api"}
-            mock_db.get_api_key_by_hash.assert_called_once_with(key_hash)
-
-    @pytest.mark.asyncio
-    async def test_invalid_api_key_raises(self):
-        """An API key not found in DynamoDB should raise AuthenticationException."""
-        request = _make_request(
-            api_key="lw_nonexistentkey12345678901234567890123456789012"
+    async def test_expired_token_is_401(self, client, make_account):
+        acct = await make_account()
+        token = create_access_token(
+            {"sub": acct.user_id}, expires_delta=timedelta(seconds=-1)
         )
-
-        with patch(
-            "llmwatch.services.dynamo_service.get_dynamo_service"
-        ) as mock_get_db:
-            mock_db = MagicMock()
-            mock_db.get_api_key_by_hash.return_value = None
-            mock_get_db.return_value = mock_db
-
-            with pytest.raises(AuthenticationException, match="Invalid API key"):
-                await get_current_user(request=request, token=None)
-
-    @pytest.mark.asyncio
-    async def test_inactive_api_key_raises(self):
-        """A revoked (is_active=False) key should raise AuthenticationException."""
-        import hashlib
-
-        raw_key = "lw_revokedkey123456789012345678901234567890123456"
-        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-
-        mock_record = {
-            "key_hash": key_hash,
-            "key_id": "kid-2",
-            "user_id": "user-x",
-            "company_id": "comp-x",
-            "is_active": False,
-        }
-
-        request = _make_request(api_key=raw_key)
-
-        with patch(
-            "llmwatch.services.dynamo_service.get_dynamo_service"
-        ) as mock_get_db:
-            mock_db = MagicMock()
-            mock_db.get_api_key_by_hash.return_value = mock_record
-            mock_get_db.return_value = mock_db
-
-            with pytest.raises(AuthenticationException, match="revoked"):
-                await get_current_user(request=request, token=None)
-
-    @pytest.mark.asyncio
-    async def test_api_key_takes_priority_over_jwt(self):
-        """When both X-API-Key and Bearer token are provided, API key wins."""
-        import hashlib
-
-        raw_key = "lw_prioritytest1234567890123456789012345678901234"
-        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-
-        mock_record = {
-            "key_hash": key_hash,
-            "key_id": "kid-3",
-            "user_id": "api-user",
-            "company_id": "api-comp",
-            "is_active": True,
-        }
-
-        jwt_token = create_access_token(
-            data={"sub": "jwt-user", "company_id": "jwt-comp"}
+        resp = await client.get(
+            "/auth/me", headers={"Authorization": f"Bearer {token}"}
         )
-        request = _make_request(api_key=raw_key)
+        assert resp.status_code == 401
 
-        with patch(
-            "llmwatch.services.dynamo_service.get_dynamo_service"
-        ) as mock_get_db:
-            mock_db = MagicMock()
-            mock_db.get_api_key_by_hash.return_value = mock_record
-            mock_db.update_api_key_usage = MagicMock()
-            mock_get_db.return_value = mock_db
+    async def test_token_for_deleted_user_is_401(
+        self, client, make_account, db_session
+    ):
+        acct = await make_account()
+        user = await db_session.get(User, acct.user_id)
+        await db_session.delete(user)
+        await db_session.commit()
 
-            result = await get_current_user(request=request, token=jwt_token)
-            # API key should win over JWT
-            assert result == {"user_id": "api-user", "company_id": "api-comp"}
+        resp = await client.get("/auth/me", headers=acct.headers)
+        assert resp.status_code == 401
+
+    async def test_token_for_deactivated_user_is_401(
+        self, client, make_account, db_session
+    ):
+        acct = await make_account()
+        user = await db_session.get(User, acct.user_id)
+        user.is_active = False
+        await db_session.commit()
+
+        resp = await client.get("/auth/me", headers=acct.headers)
+        assert resp.status_code == 401
+        assert "disabled" in resp.json()["error"].lower()
+
+    async def test_workspace_comes_from_db_not_token(self, client, make_account):
+        """A forged workspace claim in a validly signed token is ignored."""
+        alice = await make_account(workspace="A")
+        bob = await make_account(workspace="B")
+        token = create_access_token(
+            {"sub": alice.user_id, "workspace_id": bob.workspace_id}
+        )
+        resp = await client.get(
+            "/auth/me", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.json()["workspace"]["id"] == alice.workspace_id
+
+
+class TestApiKey:
+    async def test_valid_api_key_returns_user_context(self, client, make_account):
+        acct = await make_account()
+        key = await _api_key(client, acct)
+
+        resp = await client.get("/auth/me", headers={"X-API-Key": key["raw_key"]})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["auth_method"] == "api_key"
+        assert body["user"]["id"] == acct.user_id
+        assert body["workspace"]["id"] == acct.workspace_id
+
+    async def test_unknown_api_key_is_401(self, client):
+        resp = await client.get("/auth/me", headers={"X-API-Key": "lw_" + "0" * 48})
+        assert resp.status_code == 401
+        assert resp.json()["error"] == "Invalid API key"
+
+    async def test_inactive_api_key_is_401(self, client, make_account, db_session):
+        acct = await make_account()
+        key = await _api_key(client, acct)
+        row = (await db_session.execute(select(ApiKey))).scalar_one()
+        row.is_active = False
+        await db_session.commit()
+
+        resp = await client.get("/auth/me", headers={"X-API-Key": key["raw_key"]})
+        assert resp.status_code == 401
+        assert "revoked" in resp.json()["error"]
+
+    async def test_api_key_usage_is_tracked(self, client, make_account, db_session):
+        acct = await make_account()
+        key = await _api_key(client, acct)
+        for _ in range(3):
+            await client.get("/auth/me", headers={"X-API-Key": key["raw_key"]})
+
+        row = (await db_session.execute(select(ApiKey))).scalar_one()
+        await db_session.refresh(row)
+        assert row.request_count == 3
+        assert row.last_used_at is not None
+
+    async def test_api_key_of_deactivated_user_is_401(
+        self, client, make_account, db_session
+    ):
+        acct = await make_account()
+        key = await _api_key(client, acct)
+        user = await db_session.get(User, acct.user_id)
+        user.is_active = False
+        await db_session.commit()
+
+        resp = await client.get("/auth/me", headers={"X-API-Key": key["raw_key"]})
+        assert resp.status_code == 401
+
+    async def test_api_key_takes_priority_over_jwt(self, client, make_account):
+        alice = await make_account(workspace="A")
+        bob = await make_account(workspace="B")
+        key = await _api_key(client, bob)
+
+        resp = await client.get(
+            "/auth/me", headers={**alice.headers, "X-API-Key": key["raw_key"]}
+        )
+        assert resp.json()["workspace"]["id"] == bob.workspace_id
+
+    @pytest.mark.parametrize("header", ["x-api-key", "X-API-KEY"])
+    async def test_header_name_is_case_insensitive(self, client, make_account, header):
+        acct = await make_account()
+        key = await _api_key(client, acct)
+        resp = await client.get("/auth/me", headers={header: key["raw_key"]})
+        assert resp.status_code == 200
