@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     dynamodb_table_traces: str = "llmwatch_traces"
     dynamodb_table_api_keys: str = "llmwatch_api_keys"
 
+    # Database
+    # WHY: SQLite works with zero setup; set postgresql+asyncpg://... for Postgres
+    # (install the "postgres" extra).
+    database_url: str = "sqlite+aiosqlite:///./data/llmwatch.db"
+    db_echo: bool = False
+    # Apply pending Alembic migrations at startup.
+    auto_migrate: bool = True
+
     # Auth Settings
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
@@ -140,9 +148,12 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# WHY: We configure logging here so it's standardized across all modules using config
+# WHY: Logging is configured here so it's standardized across all modules. Only our
+# own logger goes to DEBUG in development; libraries (aiosqlite, httpx, ...) stay at
+# WARNING, otherwise every SQL round trip is logged.
 logging.basicConfig(
-    level=logging.DEBUG if settings.app_env == "development" else logging.WARNING,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("llmwatch")
+logger.setLevel(logging.DEBUG if settings.app_env == "development" else logging.INFO)

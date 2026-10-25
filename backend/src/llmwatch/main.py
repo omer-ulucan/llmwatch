@@ -4,6 +4,7 @@ Purpose: Main application entrypoint configuring routers, middleware, and except
 WHY: Serving as the orchestrator, it centralizes app configuration to ensure consistent behavior.
 """
 
+import asyncio
 import time
 from contextlib import asynccontextmanager
 
@@ -12,6 +13,8 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from llmwatch.config import logger, settings
+from llmwatch.db import migrate
+from llmwatch.db.engine import dispose_engine, is_memory_sqlite
 from llmwatch.exceptions import LLMWatchException
 from llmwatch.middleware.security import setup_security_middleware
 from llmwatch.rate_limit import limiter, rate_limit_exceeded_handler
@@ -29,10 +32,26 @@ async def lifespan(app: FastAPI):
             "DEMO_MODE is enabled: anyone can log in with the public demo "
             "credentials. Never expose this instance to the internet."
         )
+    await run_startup_migrations()
     logger.info(
         f"LLMWatch {settings.app_version} startup complete in environment: {settings.app_env}"
     )
     yield
+    await dispose_engine()
+
+
+async def run_startup_migrations() -> None:
+    """Brings the database schema up to date before serving requests."""
+    if not settings.auto_migrate:
+        return
+    if is_memory_sqlite(settings.database_url):
+        # WHY: Alembic would migrate its own connection's private memory database,
+        # not the one the app uses. Tests create in-memory schemas directly.
+        logger.info("In-memory database: skipping migrations")
+        return
+    # WHY: Alembic is synchronous and runs its own event loop; keep it off ours.
+    await asyncio.to_thread(migrate.upgrade, settings.database_url)
+    logger.info("Database schema is up to date")
 
 
 app = FastAPI(
