@@ -44,7 +44,7 @@ class AuthorizationException(LLMWatchException):
 
 
 class ResourceNotFoundException(LLMWatchException):
-    """Raised when a specific requested resource (e.g. DynamoDB item) is not found."""
+    """Raised when a specific requested resource is not found."""
 
     def __init__(self, message: str):
         super().__init__(message, code="RESOURCE_NOT_FOUND")
@@ -66,7 +66,7 @@ class LLMServiceException(LLMWatchException):
 
 
 class DatabaseException(LLMWatchException):
-    """Raised when a DynamoDB abstraction fails, preventing raw AWS errors returning to client."""
+    """Raised when a database operation fails, without exposing driver errors to clients."""
 
     def __init__(self, message: str):
         super().__init__(message, code="DATABASE_ERROR")

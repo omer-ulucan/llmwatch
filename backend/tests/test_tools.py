@@ -3,7 +3,7 @@ Tests for the LLMWatch agent tools.
 
 WHY: Each tool is tested independently with appropriate mocking to ensure
 correct behavior without external dependencies (no real web searches,
-no real DynamoDB calls, no real URL fetches).
+no real database writes outside the test DB, no real URL fetches).
 """
 
 import sys

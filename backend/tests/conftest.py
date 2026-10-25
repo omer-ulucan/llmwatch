@@ -16,13 +16,6 @@ import pytest
 #    when `config.Settings()` is instantiated at import time.
 # ---------------------------------------------------------------------------
 _TEST_ENV = {
-    "AWS_REGION": "us-east-1",
-    "AWS_ACCESS_KEY_ID": "testing",
-    "AWS_SECRET_ACCESS_KEY": "testing",
-    "DYNAMODB_TABLE_LOGS": "test-logs",
-    "DYNAMODB_TABLE_USERS": "test-users",
-    "DYNAMODB_TABLE_TRACES": "test-traces",
-    "DYNAMODB_TABLE_API_KEYS": "test-api-keys",
     "SECRET_KEY": "test-secret-key-for-jwt-do-not-use-in-prod",
     "JWT_ALGORITHM": "HS256",
     "JWT_EXPIRE_HOURS": "24",

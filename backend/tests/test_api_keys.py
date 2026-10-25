@@ -1,19 +1,15 @@
 """
 Tests for the API key management feature:
 - Schema validation (CreateApiKeyRequest, ApiKeyResponse, etc.)
-- DynamoDB service methods (save, get, list, delete, usage update)
 - Router endpoint logic (create, list, regenerate, revoke)
 - Key generation and hashing utilities
 """
 
 import hashlib
-from unittest.mock import MagicMock
 
 import pytest
-from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
-from llmwatch.exceptions import DatabaseException
 from llmwatch.models.schemas import (
     ApiKeyListResponse,
     ApiKeyResponse,
@@ -148,138 +144,6 @@ class TestKeyGeneration:
         assert key.user_id == "uid-1"
         assert key.name == "Test Key"
         assert key.prefix == "lw_abc123d..."
-
-
-# ── DynamoDB Service Method Tests ─────────────────────────────────────────
-
-
-class TestDynamoServiceApiKeys:
-    def test_save_api_key_success(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.put_item = MagicMock()
-
-        key_data = {"key_hash": "abc", "key_id": "kid-1"}
-        DynamoDBService.save_api_key(svc, key_data)
-        svc.api_keys_table.put_item.assert_called_once_with(Item=key_data)
-
-    def test_save_api_key_failure_raises_database(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        error_response = {"Error": {"Code": "InternalServerError", "Message": "fail"}}
-        svc.api_keys_table.put_item.side_effect = ClientError(error_response, "PutItem")
-
-        with pytest.raises(DatabaseException, match="Failed to save API key"):
-            DynamoDBService.save_api_key(svc, {"key_hash": "abc"})
-
-    def test_get_api_key_by_hash_found(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.get_item.return_value = {
-            "Item": {"key_hash": "abc", "company_id": "c1"}
-        }
-
-        result = DynamoDBService.get_api_key_by_hash(svc, "abc")
-        assert result == {"key_hash": "abc", "company_id": "c1"}
-
-    def test_get_api_key_by_hash_not_found(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.get_item.return_value = {}
-
-        result = DynamoDBService.get_api_key_by_hash(svc, "nonexistent")
-        assert result is None
-
-    def test_get_api_keys_by_company(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.query.return_value = {
-            "Items": [
-                {"key_id": "k1", "company_id": "c1"},
-                {"key_id": "k2", "company_id": "c1"},
-            ]
-        }
-
-        result = DynamoDBService.get_api_keys_by_company(svc, "c1")
-        assert len(result) == 2
-
-    def test_get_api_key_by_id_found_and_owned(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.query.return_value = {
-            "Items": [{"key_id": "kid-1", "company_id": "c1", "key_hash": "h1"}]
-        }
-
-        result = DynamoDBService.get_api_key_by_id(svc, "c1", "kid-1")
-        assert result is not None
-        assert result["key_id"] == "kid-1"
-
-    def test_get_api_key_by_id_cross_tenant_rejected(self):
-        """Key found but owned by different company — should return None."""
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.query.return_value = {
-            "Items": [
-                {"key_id": "kid-1", "company_id": "other-company", "key_hash": "h1"}
-            ]
-        }
-
-        result = DynamoDBService.get_api_key_by_id(svc, "my-company", "kid-1")
-        assert result is None
-
-    def test_delete_api_key_success(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.delete_item = MagicMock()
-
-        DynamoDBService.delete_api_key(svc, "hash123")
-        svc.api_keys_table.delete_item.assert_called_once_with(
-            Key={"key_hash": "hash123"}
-        )
-
-    def test_update_api_key_usage(self):
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        svc.api_keys_table.update_item = MagicMock()
-
-        DynamoDBService.update_api_key_usage(svc, "hash123")
-        svc.api_keys_table.update_item.assert_called_once()
-
-        call_kwargs = svc.api_keys_table.update_item.call_args
-        assert "request_count" in str(call_kwargs)
-        assert "last_used_at" in str(call_kwargs)
-
-    def test_update_api_key_usage_failure_does_not_raise(self):
-        """Usage tracking failure should be silent (logged, not re-raised)."""
-        from llmwatch.services.dynamo_service import DynamoDBService
-
-        svc = MagicMock(spec=DynamoDBService)
-        svc.api_keys_table = MagicMock()
-        error_response = {"Error": {"Code": "InternalServerError", "Message": "fail"}}
-        svc.api_keys_table.update_item.side_effect = ClientError(
-            error_response, "UpdateItem"
-        )
-
-        # Should not raise — the method swallows the error
-        DynamoDBService.update_api_key_usage(svc, "hash123")
 
 
 # ── Router Endpoint Tests (SQL) ───────────────────────────────────────────

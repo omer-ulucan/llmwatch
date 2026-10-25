@@ -3,7 +3,7 @@ Module: tracing_service.py
 Purpose: Provides the TracingCallbackHandler for LangChain agent execution and AgentEvent data model.
 WHY: By extending LangChain's BaseCallbackHandler, we capture every agent step (thinking, tool calls,
 tool results, final answers) as structured events. These events serve double duty: streamed to the
-frontend via SSE in real-time AND persisted to DynamoDB for the trace viewer.
+frontend via SSE in real-time AND persisted to the database for the trace viewer.
 """
 
 import asyncio
@@ -311,7 +311,7 @@ class TracingCallbackHandler(BaseCallbackHandler):
     def build_summary(self, success: bool) -> AgentRunSummary:
         """
         Build the final run summary after the agent completes.
-        WHY: This is emitted as the last SSE event and also stored in DynamoDB.
+        WHY: This is emitted as the last SSE event and also stored in the database.
         """
         total_latency_ms = (time.perf_counter() - self._run_start_time) * 1000
 
@@ -330,9 +330,9 @@ class TracingCallbackHandler(BaseCallbackHandler):
         self, prompt: str, tools_enabled: List[str], success: bool
     ) -> Dict[str, Any]:
         """
-        Build the complete trace data dict for DynamoDB storage.
-        WHY: One item per run (not per step) — DynamoDB items can be 400KB,
-        and a trace with 20 steps fits easily. Single-item reads are faster and cheaper.
+        Build the complete trace data dict for storage.
+        WHY: One row per run (not per step), with the steps as JSON, so a trace
+        loads in a single read.
         """
         summary = self.build_summary(success)
 
