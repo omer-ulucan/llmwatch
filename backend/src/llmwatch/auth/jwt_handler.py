@@ -8,10 +8,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 
 from llmwatch.config import settings
 from llmwatch.exceptions import AuthenticationException
+from llmwatch.security.secrets import jwt_signing_key
 
 # WHY: bcrypt with 12 rounds is industry standard for secure hashing.
 BCRYPT_ROUNDS = 12
@@ -54,30 +55,24 @@ def create_access_token(
     Generate a new JWT token.
 
     Args:
-        data: Payload content to embed (usually sub = user_id, company_id = company_id).
+        data: Payload content to embed (usually sub = user_id plus workspace claims).
         expires_delta: Optional custom expiry time.
 
     Returns:
         str: Encoded JWT string.
     """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        # WHY: 24h as per requirement
-        expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)
-
-    to_encode.update({"exp": expire})
-
-    encoded_jwt = jwt.encode(
-        to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
-    )
-    return encoded_jwt
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(hours=settings.jwt_expire_hours))
+    payload = {**data, "iat": now, "exp": expire}
+    return jwt.encode(payload, jwt_signing_key(), algorithm=settings.jwt_algorithm)
 
 
 def decode_access_token(token: str) -> Dict[str, Any]:
     """
     Decode and validate a JWT token.
+
+    WHY: Only the configured HMAC algorithm is accepted (no "none", no algorithm
+    confusion), and exp/sub must be present.
 
     Args:
         token: the JWT literal string.
@@ -89,9 +84,13 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         Dict: the decoded payload.
     """
     try:
-        payload = jwt.decode(
-            token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+        return jwt.decode(
+            token,
+            jwt_signing_key(),
+            algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "sub"]},
         )
-        return payload
-    except JWTError:
+    except jwt.MissingRequiredClaimError:
+        raise AuthenticationException("Invalid token payload structure")
+    except jwt.PyJWTError:
         raise AuthenticationException("Could not validate credentials")

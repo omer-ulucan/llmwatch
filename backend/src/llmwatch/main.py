@@ -19,6 +19,7 @@ from llmwatch.exceptions import LLMWatchException
 from llmwatch.middleware.security import setup_security_middleware
 from llmwatch.rate_limit import limiter, rate_limit_exceeded_handler
 from llmwatch.routers import agent, analytics, api_keys, auth, chat
+from llmwatch.security.secrets import server_secret
 
 # WHY: We apply slowapi rate limiters at the application layer to block abuse
 
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
             "DEMO_MODE is enabled: anyone can log in with the public demo "
             "credentials. Never expose this instance to the internet."
         )
+    # Fail fast on a bad secret, and create the generated one before serving.
+    server_secret()
     await run_startup_migrations()
     logger.info(
         f"LLMWatch {settings.app_version} startup complete in environment: {settings.app_env}"

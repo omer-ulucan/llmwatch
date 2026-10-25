@@ -51,8 +51,15 @@ class Settings(BaseSettings):
     auto_migrate: bool = True
 
     # Auth Settings
-    jwt_secret_key: str
-    jwt_algorithm: str = "HS256"
+    # WHY: One server secret; JWT signing and provider-key encryption keys are
+    # derived from it (llmwatch.security.secrets). Leave it unset to have a random
+    # secret generated once and stored in secret_key_file (back that file up:
+    # losing it logs everyone out and makes stored provider API keys unreadable).
+    secret_key: str = ""
+    secret_key_file: str = "./data/secret_key"
+    # Legacy name for secret_key, still honoured when secret_key is unset.
+    jwt_secret_key: str = ""
+    jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     jwt_expire_hours: int = 24
 
     # LLM Models Settings
@@ -103,20 +110,24 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    @field_validator("jwt_secret_key")
+    @field_validator("secret_key", "jwt_secret_key")
     @classmethod
-    def _require_strong_jwt_secret(cls, v: str) -> str:
+    def _require_strong_secret(cls, v: str, info) -> str:
         # WHY: Short HS256 secrets can be brute-forced offline from one captured
-        # token, letting an attacker mint tokens for any tenant.
+        # token, letting an attacker mint tokens for any tenant. Empty means "not
+        # set" (a strong secret is then generated and persisted).
+        name = info.field_name.upper()
+        if not v:
+            return v
         if len(v) < MIN_SECRET_LENGTH:
             raise ValueError(
-                f"JWT_SECRET_KEY must be at least {MIN_SECRET_LENGTH} characters; "
-                "generate one with: openssl rand -hex 32"
+                f"{name} must be at least {MIN_SECRET_LENGTH} characters; "
+                "generate one with: openssl rand -hex 32 (or leave it unset)"
             )
         if v in _PLACEHOLDER_SECRETS:
             raise ValueError(
-                "JWT_SECRET_KEY is still the .env.example placeholder; "
-                "generate one with: openssl rand -hex 32"
+                f"{name} is still a documented placeholder; "
+                "generate one with: openssl rand -hex 32 (or leave it unset)"
             )
         return v
 
