@@ -58,6 +58,20 @@ class Settings(BaseSettings):
     qwen_api_key: str = ""
     qwen_model: str = "qwen3.5-35b-a3b"
 
+    # Providers seeded into every workspace at startup (managed by env; editable in
+    # the UI otherwise). Leave empty to skip.
+    openai_api_key: str = ""
+    openrouter_api_key: str = ""
+    groq_api_key: str = ""
+    together_api_key: str = ""
+    ollama_base_url: str = ""
+    vllm_base_url: str = ""
+    vllm_api_key: str = ""
+    # WHY: Local models (Ollama, vLLM) live on private addresses, so allowing them is
+    # the self-hosted default. Multi-tenant deployments should set false so workspace
+    # owners can't point "test connection" at internal services.
+    provider_allow_private_urls: bool = True
+
     # MLFlow Settings
     # Optional: also log every LLM call to an MLflow tracking server (needs the
     # "mlflow" extra). Empty disables MLflow entirely.

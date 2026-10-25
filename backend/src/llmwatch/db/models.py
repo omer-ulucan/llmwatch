@@ -154,6 +154,9 @@ class Provider(Base):
     base_url: Mapped[str] = mapped_column(String(500), nullable=False)
     # Fernet token; never returned by the API.
     api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Last characters of the key, stored at write time so listing providers never
+    # needs to decrypt anything.
+    api_key_hint: Mapped[str | None] = mapped_column(String(8), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # True for providers seeded from environment variables at startup.
     managed_by_env: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

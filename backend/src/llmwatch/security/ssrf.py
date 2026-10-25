@@ -173,6 +173,11 @@ async def _resolve_and_validate(
     return addresses[0]
 
 
+async def ensure_public_host(host: str, port: int) -> None:
+    """Raises BlockedURLError unless every address of `host` is public."""
+    await _resolve_and_validate(host, port, [], _system_resolver)
+
+
 def _validate_url(url: str) -> httpx.URL:
     try:
         parsed = httpx.URL(url)
