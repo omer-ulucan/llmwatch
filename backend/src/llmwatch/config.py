@@ -70,10 +70,15 @@ class Settings(BaseSettings):
     # MLFlow Settings
     mlflow_tracking_uri: str
 
-    # Demo Mode — allows login with shared demo credentials.
+    # Signups: when false, only the very first account can be created (bootstrap).
+    allow_signup: bool = True
+
+    # Demo Mode — seeds a demo account with shared, public credentials.
     # WHY: Handy for local demos, but the credentials are public, so it is off by
     # default and refused when APP_ENV=production (see _refuse_demo_in_production).
     demo_mode: bool = False
+    demo_email: str = "demo@llmwatch.dev"
+    demo_password: str = "llmwatch-demo"
 
     # Rate limiting
     # WHY: Comma-separated CIDRs of reverse proxies whose X-Forwarded-For header is

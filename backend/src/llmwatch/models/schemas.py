@@ -4,9 +4,17 @@ Purpose: Pydantic v2 schemas for request and response validation.
 WHY: Strict typing and explicit forbid of extra fields stops injection vulnerabilities at the API boundary.
 """
 
+from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from llmwatch.tools.registry import ALL_TOOLS, available_tools
 
@@ -15,7 +23,28 @@ class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: EmailStr
     password: str = Field(..., min_length=8)
-    company_name: str
+    workspace_name: Optional[str] = Field(None, min_length=1, max_length=200)
+    # Deprecated alias of workspace_name, accepted for older clients.
+    company_name: Optional[str] = Field(None, min_length=1, max_length=200)
+
+    @field_validator("password")
+    @classmethod
+    def _bcrypt_length_limit(cls, v: str) -> str:
+        # WHY: bcrypt only uses the first 72 bytes; refuse longer passwords instead
+        # of silently ignoring the rest.
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes")
+        return v
+
+    @model_validator(mode="after")
+    def _require_workspace_name(self) -> "RegisterRequest":
+        if not (self.workspace_name or self.company_name):
+            raise ValueError("workspace_name is required")
+        return self
+
+    @property
+    def resolved_workspace_name(self) -> str:
+        return (self.workspace_name or self.company_name or "").strip()
 
 
 class LoginRequest(BaseModel):
@@ -32,7 +61,34 @@ class TokenResponse(BaseModel):
 
 class RegisterResponse(BaseModel):
     message: str
+    workspace_id: str
+    # Deprecated alias of workspace_id, kept for older clients.
     company_id: str
+
+
+class UserInfo(BaseModel):
+    id: Optional[str]
+    email: Optional[str]
+    role: str
+
+
+class WorkspaceInfo(BaseModel):
+    id: str
+    name: str
+    created_at: datetime
+
+
+class MeResponse(BaseModel):
+    user: UserInfo
+    workspace: WorkspaceInfo
+    auth_method: str
+
+
+class DeleteWorkspaceRequest(BaseModel):
+    """Typed confirmation, so a stray request can't wipe a workspace."""
+
+    model_config = ConfigDict(extra="forbid")
+    confirm_name: str
 
 
 class ChatCompletionRequest(BaseModel):

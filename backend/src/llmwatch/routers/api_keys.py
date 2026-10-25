@@ -4,18 +4,20 @@ Purpose: CRUD endpoints for managing API keys used for programmatic access.
 WHY: API keys provide a stateless, long-lived alternative to JWT tokens for
 machine-to-machine integrations (SDKs, CI pipelines, monitoring scripts).
 The raw key is returned ONCE at creation time — only a SHA-256 hash is stored.
+Managing keys requires a browser session (see get_session_user).
 """
 
-import hashlib
 import secrets
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from llmwatch.auth.dependencies import get_session_user
+from llmwatch.auth.dependencies import get_session_user, hash_api_key
 from llmwatch.config import logger
+from llmwatch.db.engine import get_session
+from llmwatch.db.models import ApiKey
+from llmwatch.db.repository import WorkspaceRepository
 from llmwatch.exceptions import ResourceNotFoundException
 from llmwatch.models.schemas import (
     ApiKeyListResponse,
@@ -24,9 +26,12 @@ from llmwatch.models.schemas import (
     CreateApiKeyResponse,
 )
 from llmwatch.rate_limit import limiter
-from llmwatch.services.dynamo_service import get_dynamo_service
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
+
+
+class ApiKeyRepository(WorkspaceRepository[ApiKey]):
+    model = ApiKey
 
 
 def _generate_raw_key() -> str:
@@ -42,33 +47,34 @@ def _hash_key(raw_key: str) -> str:
     WHY: We never store the raw key. If the database is compromised,
     the attacker cannot recover usable API keys from the hashes.
     """
-    return hashlib.sha256(raw_key.encode()).hexdigest()
+    return hash_api_key(raw_key)
 
 
-def _build_key_record(
-    raw_key: str, name: str, user_id: str, company_id: str
-) -> Dict[str, Any]:
-    """Build the DynamoDB item for a new API key.
-    WHY: Centralizes record construction to keep endpoint handlers clean
-    and ensure consistent field population.
-    """
-    now = datetime.now(timezone.utc).isoformat()
-    key_id = str(uuid.uuid4())
-    key_hash = _hash_key(raw_key)
-    prefix = raw_key[:10] + "..."  # "lw_" + first 7 hex chars + "..."
+def _new_key(raw_key: str, name: str, user_id: str) -> ApiKey:
+    return ApiKey(
+        name=name,
+        user_id=user_id,
+        key_hash=_hash_key(raw_key),
+        prefix=raw_key[:10] + "...",  # "lw_" + first 7 hex chars + "..."
+    )
 
-    return {
-        "key_hash": key_hash,
-        "key_id": key_id,
-        "company_id": company_id,
-        "user_id": user_id,
-        "name": name,
-        "prefix": prefix,
-        "created_at": now,
-        "last_used_at": None,
-        "request_count": 0,
-        "is_active": True,
-    }
+
+def _created_response(key: ApiKey, raw_key: str) -> CreateApiKeyResponse:
+    return CreateApiKeyResponse(
+        key_id=key.id,
+        name=key.name,
+        raw_key=raw_key,
+        prefix=key.prefix,
+        created_at=key.created_at.isoformat(),
+    )
+
+
+async def _owned_key(repo: ApiKeyRepository, key_id: str) -> ApiKey:
+    key = await repo.get(key_id)
+    if key is None:
+        # WHY: Same 404 for "doesn't exist" and "belongs to another workspace".
+        raise ResourceNotFoundException(f"API key not found: {key_id}")
+    return key
 
 
 @router.post(
@@ -82,35 +88,22 @@ async def create_api_key(
     request: Request,
     body: CreateApiKeyRequest,
     current_user: Dict[str, Any] = Depends(get_session_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Creates a new API key for programmatic access.
     WHY: The raw key is returned in this response ONLY — it is never stored or
     retrievable again. The user must copy it immediately.
     """
+    repo = ApiKeyRepository(session, current_user["workspace_id"])
     raw_key = _generate_raw_key()
-    record = _build_key_record(
-        raw_key=raw_key,
-        name=body.name,
-        user_id=current_user["user_id"],
-        company_id=current_user["company_id"],
-    )
-
-    db = get_dynamo_service()
-    db.save_api_key(record)
+    key = repo.add(_new_key(raw_key, body.name, current_user["user_id"]))
+    await session.commit()
 
     logger.info(
-        f"API key created: key_id={record['key_id']} "
-        f"company={current_user['company_id']}"
+        f"API key created: key_id={key.id} workspace={current_user['workspace_id']}"
     )
-
-    return CreateApiKeyResponse(
-        key_id=record["key_id"],
-        name=record["name"],
-        raw_key=raw_key,
-        prefix=record["prefix"],
-        created_at=record["created_at"],
-    )
+    return _created_response(key, raw_key)
 
 
 @router.get("", response_model=ApiKeyListResponse, summary="List all API keys")
@@ -118,29 +111,29 @@ async def create_api_key(
 async def list_api_keys(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_session_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """
-    Returns all API keys for the authenticated user's company.
+    Returns all API keys for the authenticated user's workspace.
     WHY: The settings page needs to display key names, masked prefixes,
     usage stats, and provide revoke/regenerate controls.
     """
-    db = get_dynamo_service()
-    items = db.get_api_keys_by_company(current_user["company_id"])
-
-    keys = [
-        ApiKeyResponse(
-            key_id=item["key_id"],
-            name=item["name"],
-            prefix=item["prefix"],
-            created_at=item["created_at"],
-            last_used_at=item.get("last_used_at"),
-            request_count=int(item.get("request_count", 0)),
-            is_active=item.get("is_active", True),
-        )
-        for item in items
-    ]
-
-    return ApiKeyListResponse(keys=keys)
+    repo = ApiKeyRepository(session, current_user["workspace_id"])
+    keys = await repo.list(order_by=ApiKey.created_at.desc())
+    return ApiKeyListResponse(
+        keys=[
+            ApiKeyResponse(
+                key_id=k.id,
+                name=k.name,
+                prefix=k.prefix,
+                created_at=k.created_at.isoformat(),
+                last_used_at=k.last_used_at.isoformat() if k.last_used_at else None,
+                request_count=k.request_count,
+                is_active=k.is_active,
+            )
+            for k in keys
+        ]
+    )
 
 
 @router.post(
@@ -153,6 +146,7 @@ async def regenerate_api_key(
     request: Request,
     key_id: str,
     current_user: Dict[str, Any] = Depends(get_session_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Revokes the old key and issues a new one with the same name.
@@ -160,38 +154,19 @@ async def regenerate_api_key(
     just revoking lets users seamlessly update their integrations without
     needing to reconfigure the key name.
     """
-    db = get_dynamo_service()
+    repo = ApiKeyRepository(session, current_user["workspace_id"])
+    existing = await _owned_key(repo, key_id)
 
-    # Find existing key (verifies company ownership)
-    existing = db.get_api_key_by_id(current_user["company_id"], key_id)
-    if not existing:
-        raise ResourceNotFoundException(f"API key not found: {key_id}")
-
-    # Delete the old key
-    db.delete_api_key(existing["key_hash"])
-
-    # Create new key with same name
     raw_key = _generate_raw_key()
-    record = _build_key_record(
-        raw_key=raw_key,
-        name=existing["name"],
-        user_id=current_user["user_id"],
-        company_id=current_user["company_id"],
-    )
-    db.save_api_key(record)
+    new_key = repo.add(_new_key(raw_key, existing.name, current_user["user_id"]))
+    await repo.delete(existing)
+    await session.commit()
 
     logger.info(
-        f"API key regenerated: old_key_id={key_id} new_key_id={record['key_id']} "
-        f"company={current_user['company_id']}"
+        f"API key regenerated: old_key_id={key_id} new_key_id={new_key.id} "
+        f"workspace={current_user['workspace_id']}"
     )
-
-    return CreateApiKeyResponse(
-        key_id=record["key_id"],
-        name=record["name"],
-        raw_key=raw_key,
-        prefix=record["prefix"],
-        created_at=record["created_at"],
-    )
+    return _created_response(new_key, raw_key)
 
 
 @router.delete("/{key_id}", status_code=204, summary="Revoke an API key")
@@ -200,22 +175,18 @@ async def revoke_api_key(
     request: Request,
     key_id: str,
     current_user: Dict[str, Any] = Depends(get_session_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Permanently revokes (hard-deletes) an API key.
     WHY: Hard delete ensures the key can never authenticate again.
-    Soft delete would require checking is_active on every auth request,
-    adding latency and complexity with no real benefit for API keys.
     """
-    db = get_dynamo_service()
-
-    existing = db.get_api_key_by_id(current_user["company_id"], key_id)
-    if not existing:
-        raise ResourceNotFoundException(f"API key not found: {key_id}")
-
-    db.delete_api_key(existing["key_hash"])
+    repo = ApiKeyRepository(session, current_user["workspace_id"])
+    key = await _owned_key(repo, key_id)
+    await repo.delete(key)
+    await session.commit()
 
     logger.info(
-        f"API key revoked: key_id={key_id} company={current_user['company_id']}"
+        f"API key revoked: key_id={key_id} workspace={current_user['workspace_id']}"
     )
     # 204 No Content — no response body

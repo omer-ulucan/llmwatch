@@ -18,7 +18,6 @@ from botocore.exceptions import ClientError
 
 from llmwatch.auth.jwt_handler import verify_password
 from llmwatch.exceptions import (
-    AuthenticationException,
     DatabaseException,
     ValidationException,
 )
@@ -47,56 +46,18 @@ class TestVerifyPasswordSafety:
 class TestRegisterResponse:
     def test_valid(self):
         r = RegisterResponse(
-            message="User registered successfully", company_id="abc-123"
+            message="User registered successfully",
+            workspace_id="abc-123",
+            company_id="abc-123",
         )
         assert r.message == "User registered successfully"
-        assert r.company_id == "abc-123"
+        assert r.workspace_id == "abc-123"
 
     def test_missing_fields(self):
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             RegisterResponse(message="ok")  # type: ignore[call-arg]
-
-
-# ── _authenticate helper (Fix 8 shared logic) ────────────────────────────
-
-
-class TestAuthenticate:
-    def test_demo_mode_valid_credentials(self):
-        from llmwatch.routers.auth import _authenticate
-
-        with patch("llmwatch.routers.auth.settings") as mock_settings:
-            mock_settings.demo_mode = True
-            mock_settings.jwt_expire_hours = 24
-            mock_settings.jwt_secret_key = "test-secret"
-            mock_settings.jwt_algorithm = "HS256"
-            result = _authenticate("admin@company.com", "admin123")
-            assert result["token_type"] == "bearer"
-            assert result["expires_in"] == 24 * 3600
-            assert "access_token" in result
-
-    def test_demo_mode_invalid_credentials_raises_auth_exception(self):
-        """Fix 2: Login failure raises AuthenticationException (401), not ValidationException (400)."""
-        from llmwatch.routers.auth import _authenticate
-
-        with patch("llmwatch.routers.auth.settings") as mock_settings:
-            mock_settings.demo_mode = True
-            with pytest.raises(AuthenticationException) as exc_info:
-                _authenticate("wrong@email.com", "wrongpassword")
-            assert exc_info.value.code == "AUTHENTICATION_FAILED"
-
-    def test_expires_in_derived_from_settings(self):
-        """Fix 3: expires_in must reflect jwt_expire_hours, not be hardcoded."""
-        from llmwatch.routers.auth import _authenticate
-
-        with patch("llmwatch.routers.auth.settings") as mock_settings:
-            mock_settings.demo_mode = True
-            mock_settings.jwt_expire_hours = 12  # Not 24
-            mock_settings.jwt_secret_key = "test-secret"
-            mock_settings.jwt_algorithm = "HS256"
-            result = _authenticate("admin@company.com", "admin123")
-            assert result["expires_in"] == 12 * 3600  # 43200, not 86400
 
 
 # ── save_user() atomic uniqueness (Fix 1) ─────────────────────────────────

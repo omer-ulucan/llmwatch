@@ -77,3 +77,107 @@ async def db_session(db_engine):
 
     async with async_sessionmaker(db_engine, expire_on_commit=False)() as session:
         yield session
+
+
+@pytest.fixture
+async def app_db(db_engine, monkeypatch):
+    """Points the app's engine and sessionmaker at the in-memory test database."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    import llmwatch.auth.jwt_handler as jwt_handler
+    import llmwatch.db.engine as engine_module
+
+    # WHY: Production uses 12 bcrypt rounds (asserted in test_jwt_handler.py); API
+    # tests create many accounts, and 4 rounds keeps them fast.
+    monkeypatch.setattr(jwt_handler, "BCRYPT_ROUNDS", 4)
+    monkeypatch.setattr(engine_module, "_engine", db_engine)
+    monkeypatch.setattr(
+        engine_module,
+        "_sessionmaker",
+        async_sessionmaker(db_engine, expire_on_commit=False),
+    )
+    yield db_engine
+
+
+@pytest.fixture
+async def client(app_db):
+    """An HTTP client for the app, on the test's event loop, from a public IP.
+
+    WHY: httpx's ASGITransport runs the app in-process on the same loop as the test,
+    so the in-memory database connection is never shared across event loops.
+    Lifespan (migrations) doesn't run; app_db already has the schema.
+    """
+    import httpx
+
+    from llmwatch.main import app
+    from llmwatch.rate_limit import limiter
+
+    limiter.reset()
+    transport = httpx.ASGITransport(app=app, client=("203.0.113.10", 50000))
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+    limiter.reset()
+
+
+class Account:
+    """A registered user plus a valid session token."""
+
+    def __init__(self, user, workspace, password: str, token: str):
+        self.user = user
+        self.workspace = workspace
+        self.password = password
+        self.token = token
+
+    @property
+    def user_id(self) -> str:
+        return self.user.id
+
+    @property
+    def workspace_id(self) -> str:
+        return self.workspace.id
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self.token}"}
+
+
+@pytest.fixture
+def make_account(app_db):
+    """Factory: make_account(email=..., workspace=..., role=..., workspace_id=...)."""
+    import itertools
+
+    counter = itertools.count(1)
+
+    async def _make(
+        email: str | None = None,
+        workspace: str = "Acme",
+        password: str = "correct-horse-battery",
+        role: str = "owner",
+        workspace_id: str | None = None,
+    ) -> Account:
+        from llmwatch.auth.jwt_handler import create_access_token, get_password_hash
+        from llmwatch.db.engine import get_sessionmaker
+        from llmwatch.db.models import User, Workspace
+        from llmwatch.services import accounts
+
+        email = email or f"user{next(counter)}@example.com"
+        async with get_sessionmaker()() as session:
+            if workspace_id is None:
+                ws, user = await accounts.register(session, email, password, workspace)
+                if role != "owner":
+                    user.role = role
+                    await session.commit()
+            else:
+                ws = await session.get(Workspace, workspace_id)
+                user = User(
+                    workspace_id=workspace_id,
+                    email=email,
+                    password_hash=get_password_hash(password),
+                    role=role,
+                )
+                session.add(user)
+                await session.commit()
+        token = create_access_token({"sub": user.id, "workspace_id": ws.id})
+        return Account(user, ws, password, token)
+
+    return _make
