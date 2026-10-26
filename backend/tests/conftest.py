@@ -50,12 +50,17 @@ def jwt_algorithm():
 
 
 @pytest.fixture
-async def db_engine():
-    """A fresh in-memory SQLite database with the full schema."""
+async def db_engine(tmp_path):
+    """A fresh SQLite database file with the full schema.
+
+    WHY: A file (WAL, real connection pool) like production, not one shared
+    in-memory connection: concurrent sessions (eval runner workers) would interleave
+    their transactions on a single connection and lose writes.
+    """
     from llmwatch.db.engine import create_engine
     from llmwatch.db.models import Base
 
-    engine = create_engine("sqlite+aiosqlite:///:memory:")
+    engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
