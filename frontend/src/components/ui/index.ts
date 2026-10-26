@@ -8,3 +8,4 @@ export { DataTable } from './DataTable';
 export type { Column } from './DataTable';
 export { Toaster } from './Toaster';
 export { toast } from 'sonner';
+export { Switch } from './Switch';

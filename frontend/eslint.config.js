@@ -23,6 +23,16 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+      // Destructuring a prop away (`{ node, ...rest }`) or an `_unused` name is
+      // intentional.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
     },
   },
 );
