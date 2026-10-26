@@ -25,6 +25,7 @@ from llmwatch.routers import (
     api_keys,
     auth,
     chat,
+    evals,
     models,
     providers,
     workspaces,
@@ -138,6 +139,7 @@ app.include_router(api_keys.router)
 app.include_router(workspaces.router)
 app.include_router(providers.router)
 app.include_router(models.router)
+app.include_router(evals.router)
 
 
 @app.get("/health", tags=["Health"])
