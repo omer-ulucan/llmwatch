@@ -1,28 +1,31 @@
 /**
  * Component: Docs
- * Purpose: Full platform documentation — public page accessible without authentication.
- * WHY: Prospective and current users need a single reference for the API, SDKs,
- * agent system, tracing, analytics, auth, and configuration.
+ * Purpose: Public reference for running LLMWatch and calling its API.
+ * WHY: Covers what a self-hoster needs on one page: setup, providers, auth, chat,
+ * agent, evals, analytics, every endpoint and every setting. The backend also serves
+ * its interactive OpenAPI docs at /docs.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import {
-  Zap,
-  ChevronRight,
   ArrowLeft,
-  Search,
-  Book,
-  Key,
-  Terminal,
-  Bot,
-  Activity,
   BarChart3,
-  Settings,
-  Copy,
+  Book,
+  Bot,
   Check,
+  ChevronRight,
+  Copy,
+  FlaskConical,
   Hash,
+  Key,
   Menu,
+  MessageSquare,
+  Network,
+  Search,
+  Settings,
+  Terminal,
   X,
+  Zap,
 } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -31,7 +34,7 @@ interface NavItem {
   id: string;
   label: string;
   icon: React.ReactNode;
-  children?: { id: string; label: string }[];
+  children: { id: string; label: string }[];
 }
 
 /* ── Sidebar navigation structure ──────────────────────────── */
@@ -39,12 +42,23 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     id: 'getting-started',
-    label: 'Getting Started',
+    label: 'Getting started',
     icon: <Book size={16} />,
     children: [
       { id: 'quickstart', label: 'Quickstart' },
-      { id: 'installation', label: 'Installation' },
-      { id: 'demo-mode', label: 'Demo Mode' },
+      { id: 'local-dev', label: 'Local development' },
+      { id: 'demo-mode', label: 'Demo mode' },
+    ],
+  },
+  {
+    id: 'providers',
+    label: 'Providers & models',
+    icon: <Network size={16} />,
+    children: [
+      { id: 'providers-presets', label: 'Providers' },
+      { id: 'providers-ollama', label: 'Ollama and local models' },
+      { id: 'models-refs', label: 'Model references' },
+      { id: 'models-pricing', label: 'Pricing and cost' },
     ],
   },
   {
@@ -52,65 +66,191 @@ const navItems: NavItem[] = [
     label: 'Authentication',
     icon: <Key size={16} />,
     children: [
-      { id: 'auth-overview', label: 'Overview' },
-      { id: 'auth-register', label: 'Register' },
-      { id: 'auth-login', label: 'Login' },
-      { id: 'auth-tokens', label: 'Using Tokens' },
+      { id: 'auth-session', label: 'Accounts and sessions' },
+      { id: 'auth-api-keys', label: 'API keys' },
     ],
   },
   {
-    id: 'api-reference',
-    label: 'API Reference',
-    icon: <Terminal size={16} />,
+    id: 'chat',
+    label: 'Chat',
+    icon: <MessageSquare size={16} />,
     children: [
-      { id: 'api-health', label: 'Health Check' },
-      { id: 'api-chat', label: 'Chat Completions' },
-      { id: 'api-analytics-summary', label: 'Analytics Summary' },
-      { id: 'api-analytics-logs', label: 'Analytics Logs' },
-      { id: 'api-analytics-timeseries', label: 'Analytics Timeseries' },
+      { id: 'chat-completions', label: 'Completions' },
+      { id: 'chat-stream', label: 'Streaming' },
     ],
   },
   {
-    id: 'agent-system',
-    label: 'Agent System',
+    id: 'agent',
+    label: 'Agent & traces',
     icon: <Bot size={16} />,
     children: [
-      { id: 'agent-overview', label: 'Overview' },
-      { id: 'agent-run', label: 'Run Agent' },
-      { id: 'agent-tools', label: 'Available Tools' },
-      { id: 'agent-sse', label: 'SSE Streaming' },
+      { id: 'agent-run', label: 'Run the agent' },
+      { id: 'agent-tools', label: 'Tools' },
+      { id: 'agent-events', label: 'Events and traces' },
     ],
   },
   {
-    id: 'tracing',
-    label: 'Tracing',
-    icon: <Activity size={16} />,
+    id: 'evals',
+    label: 'Evals',
+    icon: <FlaskConical size={16} />,
     children: [
-      { id: 'tracing-overview', label: 'Overview' },
-      { id: 'tracing-list', label: 'List Traces' },
-      { id: 'tracing-detail', label: 'Trace Detail' },
-      { id: 'tracing-events', label: 'Event Types' },
+      { id: 'evals-suites', label: 'Suite format' },
+      { id: 'evals-evaluators', label: 'Evaluators' },
+      { id: 'evals-runs', label: 'Runs' },
+      { id: 'evals-compare', label: 'Comparisons' },
+      { id: 'evals-cli', label: 'CLI and CI' },
     ],
   },
   {
     id: 'analytics',
     label: 'Analytics',
     icon: <BarChart3 size={16} />,
+    children: [{ id: 'analytics-endpoints', label: 'Endpoints' }],
+  },
+  {
+    id: 'reference',
+    label: 'Reference',
+    icon: <Terminal size={16} />,
     children: [
-      { id: 'analytics-overview', label: 'Overview' },
-      { id: 'analytics-agent', label: 'Agent Analytics' },
+      { id: 'api-endpoints', label: 'All endpoints' },
+      { id: 'config-env', label: 'Configuration' },
+      { id: 'errors', label: 'Errors' },
+    ],
+  },
+];
+
+/* ── Content data ──────────────────────────────────────────── */
+
+const ENDPOINTS: [string, string, string][] = [
+  ['GET', '/health', 'Liveness check (no auth)'],
+  ['POST', '/auth/register', 'Create a workspace and its owner (when ALLOW_SIGNUP is on)'],
+  ['POST', '/auth/login', 'Exchange email and password for a JWT'],
+  ['GET', '/auth/me', 'The current user, workspace and role'],
+  ['GET', '/workspaces/current', 'The current workspace'],
+  ['DELETE', '/workspaces/current', 'Delete the workspace and everything in it (owner only)'],
+  ['GET', '/api-keys', 'List API keys'],
+  ['POST', '/api-keys', 'Create an API key (shown once)'],
+  ['POST', '/api-keys/{key_id}/regenerate', 'Revoke a key and issue a new one'],
+  ['DELETE', '/api-keys/{key_id}', 'Revoke a key'],
+  ['GET', '/providers/presets', 'Provider presets with default base URLs'],
+  ['GET', '/providers', 'List providers (keys masked)'],
+  ['POST', '/providers', 'Add a provider'],
+  ['GET', '/providers/{id}', 'Get a provider'],
+  ['PATCH', '/providers/{id}', 'Update a provider'],
+  ['DELETE', '/providers/{id}', 'Delete a provider and its models'],
+  ['POST', '/providers/{id}/test', 'Check the connection and list models'],
+  ['POST', '/providers/{id}/discover', 'Import the models the provider lists'],
+  ['GET', '/models', 'Models grouped by provider'],
+  ['POST', '/models', 'Add a model'],
+  ['GET', '/models/resolve', 'What a model reference points to'],
+  ['PATCH', '/models/{id}', 'Update prices, capabilities, default'],
+  ['DELETE', '/models/{id}', 'Delete a model'],
+  ['POST', '/chat/completions', 'One completion'],
+  ['POST', '/chat/stream', 'A streamed completion (SSE)'],
+  ['POST', '/agent/run', 'Run the agent (SSE)'],
+  ['POST', '/agent/runs/{run_id}/cancel', 'Cancel a running agent run'],
+  ['GET', '/agent/tools', 'Tools this server allows'],
+  ['GET', '/agent/traces', 'Recent agent traces'],
+  ['GET', '/agent/traces/{run_id}', 'One trace with all steps'],
+  ['GET', '/agent/analytics', 'Agent runs, success rate, tool usage'],
+  ['GET', '/analytics/summary', 'Totals, percentiles, per-model breakdown, deltas'],
+  ['GET', '/analytics/timeseries', 'Zero-filled time buckets'],
+  ['GET', '/analytics/logs', 'Paginated, filterable call log'],
+  ['GET', '/analytics/logs.csv', 'The filtered call log as CSV'],
+  ['GET', '/analytics/filters', 'Models and providers seen in a window'],
+  ['GET', '/evals/suites', 'List suites'],
+  ['POST', '/evals/suites', 'Create a suite from JSON'],
+  ['POST', '/evals/suites/import', 'Import YAML or JSON (same name adds a version)'],
+  ['GET', '/evals/suites/{id}', 'A suite version with its definition'],
+  ['PUT', '/evals/suites/{id}', 'Save a new version'],
+  ['DELETE', '/evals/suites/{id}', 'Delete a suite, its runs and results'],
+  ['GET', '/evals/suites/{id}/export', 'Export as YAML or JSON'],
+  ['POST', '/evals/suites/{id}/preview', 'The exact messages a case would send'],
+  ['PUT', '/evals/suites/{id}/baseline', 'Set or clear the baseline run'],
+  ['POST', '/evals/runs', 'Start one run per variant'],
+  ['GET', '/evals/runs', 'List runs (optionally for one suite)'],
+  ['GET', '/evals/runs/{id}', 'Run status and totals'],
+  ['DELETE', '/evals/runs/{id}', 'Delete a finished run'],
+  ['GET', '/evals/runs/{id}/results', 'Per-case results (filter: passed, failed, error)'],
+  ['POST', '/evals/runs/{id}/cancel', 'Cancel a run'],
+  ['POST', '/evals/runs/{id}/resume', 'Resume a cancelled, interrupted or failed run'],
+  ['GET', '/evals/compare', 'Compare a candidate run with a baseline'],
+];
+
+const ENV_GROUPS: { title: string; vars: [string, string, string][] }[] = [
+  {
+    title: 'Storage and secrets',
+    vars: [
+      ['DATABASE_URL', 'sqlite+aiosqlite:///./data/llmwatch.db', 'SQLite or postgresql+asyncpg://… (Docker uses /data)'],
+      ['AUTO_MIGRATE', 'true', 'Run database migrations on startup'],
+      ['SECRET_KEY', '(generated)', 'At least 32 characters. Unset: generated once and saved to SECRET_KEY_FILE'],
+      ['SECRET_KEY_FILE', './data/secret_key', 'Where the generated key is kept (mode 0600)'],
+      ['JWT_EXPIRE_HOURS', '24', 'Session token lifetime'],
     ],
   },
   {
-    id: 'configuration',
-    label: 'Configuration',
-    icon: <Settings size={16} />,
-    children: [
-      { id: 'config-env', label: 'Environment Variables' },
-      { id: 'config-docker', label: 'Docker Compose' },
-      { id: 'config-models', label: 'Model Configuration' },
+    title: 'Providers seeded from the environment',
+    vars: [
+      ['OPENAI_API_KEY', '', 'Adds an OpenAI provider'],
+      ['GOOGLE_API_KEY', '', 'Adds Gemini (OpenAI-compatible endpoint, GEMINI_BASE_URL)'],
+      ['OPENROUTER_API_KEY', '', 'Adds OpenRouter'],
+      ['GROQ_API_KEY', '', 'Adds Groq'],
+      ['TOGETHER_API_KEY', '', 'Adds Together'],
+      ['OLLAMA_BASE_URL', '', 'Adds Ollama, e.g. http://localhost:11434/v1'],
+      ['VLLM_BASE_URL / VLLM_API_KEY', '', 'Adds a vLLM server'],
+      ['QWEN_BASE_URL / QWEN_API_KEY', '', 'Legacy: a vLLM server for the "qwen" alias'],
+      ['PROVIDER_ALLOW_PRIVATE_URLS', 'true', 'Allow provider base URLs on private networks (needed for local models)'],
     ],
   },
+  {
+    title: 'Access',
+    vars: [
+      ['ALLOW_SIGNUP', 'true', 'Turn off after creating your account to close registration'],
+      ['DEMO_MODE', 'false', 'Seed a demo user (refused when APP_ENV=production)'],
+      ['DEMO_EMAIL / DEMO_PASSWORD', 'demo@llmwatch.dev / llmwatch-demo', 'Demo credentials'],
+      ['CORS_ORIGINS', '', 'Comma-separated origins, only needed when the UI is on another origin'],
+      ['APP_ENV', 'development', 'development or production'],
+    ],
+  },
+  {
+    title: 'Security',
+    vars: [
+      ['ENABLE_CODE_EXECUTION', 'false', 'Register the agent\'s python tool (resource-limited, not a sandbox)'],
+      ['FETCH_ALLOWED_HOSTS', '', 'If set, fetch_url only reaches these hosts'],
+      ['TRUSTED_PROXIES', '', 'CIDRs whose X-Forwarded-For is trusted (compose sets the Docker networks)'],
+      ['RATE_LIMIT_ENABLED', 'true', 'Per-user/key/IP rate limits'],
+      ['RATE_LIMIT_CHAT / RATE_LIMIT_AGENT', '60/minute / 10/minute', 'Limits for chat and agent runs'],
+      ['RATE_LIMIT_PER_IP', '300/minute', 'Default limit for other endpoints'],
+      ['RATE_LIMIT_STORAGE_URI', 'memory://', 'Use redis://… when running several workers'],
+    ],
+  },
+  {
+    title: 'Evals',
+    vars: [
+      ['EVAL_MAX_CONCURRENCY', '32', 'Upper bound for a run\'s concurrency'],
+      ['EVAL_PROVIDER_CONCURRENCY', '8', 'Parallel requests per provider across all runs'],
+      ['EVAL_PROVIDER_RPM', '600', 'Requests per minute per provider'],
+      ['EVAL_MAX_RETRIES', '5', 'Retries for rate limits, timeouts and 5xx'],
+      ['EVAL_RETRY_BASE_S / EVAL_RETRY_MAX_S', '1.0 / 30.0', 'Backoff with jitter; Retry-After is honored'],
+    ],
+  },
+  {
+    title: 'Optional integrations',
+    vars: [['MLFLOW_TRACKING_URI', '', 'Also log calls to MLflow (needs the mlflow extra)']],
+  },
+];
+
+const EVALUATORS: [string, string][] = [
+  ['exact_match', 'Output equals value (or the case\'s expected); options normalise case, whitespace and punctuation'],
+  ['contains', 'Output contains value (a string or a list; mode: all or any; case_sensitive)'],
+  ['not_contains', 'Output contains none of value'],
+  ['regex', 'Output matches the pattern in value (flags: i, m, s)'],
+  ['json_valid', 'Output is JSON (```json fences allowed)'],
+  ['json_schema', 'Output is JSON that validates against the schema in value'],
+  ['similarity', 'Embedding cosine similarity to value or expected is at least threshold'],
+  ['llm_judge', 'A judge model scores the output against the rubric in value (JSON score and reasoning, temperature 0)'],
+  ['latency_under', 'Latency is at most value milliseconds'],
+  ['cost_under', 'Cost is at most value USD (fails when the model has no price)'],
 ];
 
 /* ── Code block with copy button ───────────────────────────── */
@@ -127,7 +267,7 @@ function CodeBlock({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(children.trim());
+    void navigator.clipboard.writeText(children.trim());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -148,6 +288,7 @@ function CodeBlock({
           onClick={handleCopy}
           className="absolute top-3 right-3 p-1.5 rounded-md bg-white/[0.06] border border-card-border opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
           title="Copy to clipboard"
+          aria-label="Copy to clipboard"
         >
           {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
         </button>
@@ -163,6 +304,7 @@ function MethodBadge({ method }: { method: string }) {
     GET: 'bg-success/15 text-success border-success/20',
     POST: 'bg-primary/15 text-primary border-primary/20',
     PUT: 'bg-warning/15 text-warning border-warning/20',
+    PATCH: 'bg-warning/15 text-warning border-warning/20',
     DELETE: 'bg-error/15 text-error border-error/20',
   };
   return (
@@ -239,61 +381,67 @@ function SectionHeading({
   );
 }
 
+/* ── Small content helpers ─────────────────────────────────── */
+
+const P: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className="text-muted-foreground leading-relaxed mb-4">{children}</p>
+);
+
+const C: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <code className="px-1.5 py-0.5 rounded bg-white/[0.06] font-mono text-[0.85em] text-foreground">{children}</code>
+);
+
+const Endpoint: React.FC<{ method: string; path: string }> = ({ method, path }) => (
+  <div className="flex items-center gap-3 my-4">
+    <MethodBadge method={method} />
+    <code className="font-mono text-sm">{path}</code>
+  </div>
+);
+
+const Callout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="rounded-xl border border-warning/30 bg-warning/[0.06] p-4 my-4 text-sm text-muted-foreground leading-relaxed">
+    {children}
+  </div>
+);
+
 /* ── Main component ────────────────────────────────────────── */
 
 const Docs: React.FC = () => {
   const [activeSection, setActiveSection] = useState('quickstart');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const contentRef = useRef<HTMLDivElement>(null);
 
-  // Track active section on scroll
+  // Highlight the section currently in view.
   useEffect(() => {
-    const allIds = navItems.flatMap((item) =>
-      item.children ? item.children.map((c) => c.id) : [item.id],
-    );
-
     const observer = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-            break;
-          }
-        }
+        const visible = entries.find((e) => e.isIntersecting);
+        if (visible) setActiveSection(visible.target.id);
       },
       { rootMargin: '-80px 0px -60% 0px', threshold: 0.1 },
     );
-
-    for (const id of allIds) {
+    for (const id of navItems.flatMap((item) => item.children.map((c) => c.id))) {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     }
-
     return () => observer.disconnect();
   }, []);
 
-  // Filter nav items by search
-  const filteredNav = searchQuery
+  const q = searchQuery.toLowerCase();
+  const filteredNav = q
     ? navItems
         .map((item) => ({
           ...item,
-          children: item.children?.filter((c) =>
-            c.label.toLowerCase().includes(searchQuery.toLowerCase()),
-          ),
+          children: item.label.toLowerCase().includes(q) ? item.children : item.children.filter((c) => c.label.toLowerCase().includes(q)),
         }))
-        .filter(
-          (item) =>
-            item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (item.children && item.children.length > 0),
-        )
+        .filter((item) => item.children.length > 0)
     : navItems;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       {/* ── Top navbar ──────────────────────────────────────── */}
       <nav className="fixed top-0 inset-x-0 z-50 backdrop-blur-xl bg-background/70 border-b border-card-border">
-        <div className="max-w-[90rem] mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-2.5 group">
               <div className="w-8 h-8 bg-primary/20 text-primary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -304,14 +452,11 @@ const Docs: React.FC = () => {
               </span>
             </Link>
             <ChevronRight size={14} className="text-muted-foreground/40" />
-            <span className="text-sm text-muted-foreground">Documentation</span>
+            <span className="text-sm text-muted-foreground">Docs</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="hidden sm:inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <Link to="/" className="hidden sm:inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft size={14} />
               Home
             </Link>
@@ -319,11 +464,12 @@ const Docs: React.FC = () => {
               to="/login"
               className="text-sm font-medium bg-gradient-to-r from-primary to-primary-hover text-white px-4 py-1.5 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] hover:shadow-[0_0_25px_rgba(59,130,246,0.35)] transition-all duration-300"
             >
-              Try Demo
+              Sign in
             </Link>
             <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
               className="lg:hidden p-1.5 text-muted-foreground hover:text-foreground"
+              aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
             >
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -339,22 +485,17 @@ const Docs: React.FC = () => {
           }`}
         >
           <div className="p-4">
-            {/* Search */}
             <div className="relative mb-4">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50"
-              />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
               <input
                 type="text"
                 placeholder="Search docs..."
+                aria-label="Search docs"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.04] border border-card-border text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40 transition-colors"
               />
             </div>
-
-            {/* Nav tree */}
             <nav className="space-y-1">
               {filteredNav.map((item) => (
                 <div key={item.id}>
@@ -362,1302 +503,427 @@ const Docs: React.FC = () => {
                     {item.icon}
                     {item.label}
                   </div>
-                  {item.children && (
-                    <div className="ml-4 border-l border-card-border space-y-0.5">
-                      {item.children.map((child) => (
-                        <a
-                          key={child.id}
-                          href={`#${child.id}`}
-                          onClick={() => setMobileNavOpen(false)}
-                          className={`block pl-4 pr-3 py-1.5 text-sm transition-colors rounded-r-md ${
-                            activeSection === child.id
-                              ? 'text-primary border-l-2 border-primary -ml-px bg-primary/[0.05]'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          {child.label}
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                  <div className="ml-4 border-l border-card-border space-y-0.5">
+                    {item.children.map((child) => (
+                      <a
+                        key={child.id}
+                        href={`#${child.id}`}
+                        onClick={() => setMobileNavOpen(false)}
+                        className={`block pl-4 pr-3 py-1.5 text-sm transition-colors rounded-r-md ${
+                          activeSection === child.id
+                            ? 'text-primary border-l-2 border-primary -ml-px bg-primary/[0.05]'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {child.label}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               ))}
             </nav>
           </div>
         </aside>
 
-        {/* ── Mobile overlay ──────────────────────────────── */}
-        {mobileNavOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-            onClick={() => setMobileNavOpen(false)}
-          />
-        )}
+        {mobileNavOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setMobileNavOpen(false)} />}
 
         {/* ── Content ─────────────────────────────────────── */}
-        <main ref={contentRef} className="flex-1 min-w-0 px-6 md:px-12 py-10 max-w-4xl">
-          {/* ─────────────────────────────────────────────── */}
-          {/* GETTING STARTED                                 */}
-          {/* ─────────────────────────────────────────────── */}
-
+        <main className="flex-1 min-w-0 px-4 sm:px-6 md:px-12 py-10 max-w-4xl">
           <div className="mb-8">
-            <span className="text-sm text-primary font-medium tracking-wide uppercase">
-              Getting Started
-            </span>
-            <h1 className="text-4xl font-bold tracking-tight mt-2 mb-4">
-              LLMWatch Documentation
-            </h1>
+            <span className="text-sm text-primary font-medium tracking-wide uppercase">Documentation</span>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mt-2 mb-4">LLMWatch</h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Everything you need to integrate, monitor, and optimize your AI operations
-              with LLMWatch.
+              A self-hosted platform for LLM observability and evals: log every call with tokens, latency and cost,
+              trace agent runs, and compare models and prompts with statistics that say when a difference is real.
             </p>
           </div>
 
-          <SectionHeading id="quickstart" level={2}>
-            Quickstart
+          {/* ── Getting started ─────────────────────────── */}
+          <SectionHeading id="quickstart">Quickstart</SectionHeading>
+          <P>With Docker, no configuration is needed. The API and UI run behind one port with a SQLite database on a named volume.</P>
+          <CodeBlock title="Terminal">
+{`git clone https://github.com/omer-ulucan/llmwatch.git
+cd llmwatch
+docker compose up -d
+# open http://localhost:3000 and create an account`}
+          </CodeBlock>
+          <P>
+            On first boot the backend generates a secret key and stores it in the volume. Then open <b>Models</b>, add a provider (or set{' '}
+            <C>OPENAI_API_KEY</C>, <C>OLLAMA_BASE_URL</C> and friends in a <C>.env</C> file next to <C>docker-compose.yml</C>), and discover its
+            models. After you have created your account you can set <C>ALLOW_SIGNUP=false</C>.
+          </P>
+
+          <SectionHeading id="local-dev" level={3}>
+            Local development
           </SectionHeading>
+          <CodeBlock title="Backend (Python 3.11+)">
+{`cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+uvicorn llmwatch.main:app --reload      # http://localhost:8000, OpenAPI docs at /docs`}
+          </CodeBlock>
+          <CodeBlock title="Frontend (Node 20+)">
+{`cd frontend
+npm install
+npm run dev                             # http://localhost:3000, proxies /api to :8000`}
+          </CodeBlock>
 
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Get up and running in under five minutes. LLMWatch provides a single API
-            endpoint for all your LLM interactions, with automatic tracing, cost tracking,
-            and performance monitoring.
-          </p>
+          <SectionHeading id="demo-mode" level={3}>
+            Demo mode
+          </SectionHeading>
+          <P>
+            <C>DEMO_MODE=true</C> seeds a real user with <C>DEMO_EMAIL</C> / <C>DEMO_PASSWORD</C> and the example eval suite. It is for local
+            exploration only: the server refuses to start with demo mode on when <C>APP_ENV=production</C>.
+          </P>
 
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">1. Send your first request</h4>
-            <p className="text-sm text-muted-foreground mb-3">
-              After logging in and obtaining a JWT token, make a chat completion request:
-            </p>
-            <CodeBlock language="bash" title="cURL">
-{`curl -X POST http://localhost:8000/chat/completions \\
-  -H "Authorization: Bearer YOUR_TOKEN" \\
+          {/* ── Providers ───────────────────────────────── */}
+          <SectionHeading id="providers-presets">Providers</SectionHeading>
+          <P>
+            A provider is any OpenAI-compatible endpoint. Presets fill in the base URL for OpenAI, Gemini, OpenRouter, Groq, Together, Ollama,
+            vLLM and LM Studio; <b>Custom</b> takes any URL. Keys are encrypted at rest with a key derived from <C>SECRET_KEY</C> and the API
+            only ever returns them masked. <b>Test</b> checks the connection; <b>Discover</b> imports the models the provider lists.
+          </P>
+
+          <SectionHeading id="providers-ollama" level={3}>
+            Ollama and local models
+          </SectionHeading>
+          <P>
+            Set <C>OLLAMA_BASE_URL=http://localhost:11434/v1</C> (or add an Ollama provider in the UI) and discover models. From inside Docker,
+            use an address the container can reach, such as <C>http://host.docker.internal:11434/v1</C>. Reasoning models are told not to
+            think unless thinking is turned on, so short answers are not lost to hidden reasoning.
+          </P>
+
+          <SectionHeading id="models-refs" level={3}>
+            Model references
+          </SectionHeading>
+          <P>Anywhere the API takes a model (chat, agent, eval variants, the CLI) you can pass:</P>
+          <ul className="list-disc pl-6 mb-4 space-y-1 text-muted-foreground">
+            <li>
+              the model&apos;s id from <C>GET /models</C>,
+            </li>
+            <li>
+              <C>Provider/model-id</C>, for example <C>Ollama/qwen3:8b</C> or <C>OpenAI/gpt-4o-mini</C>,
+            </li>
+            <li>
+              <C>default</C>, the workspace&apos;s default model,
+            </li>
+            <li>
+              the legacy aliases <C>qwen</C> and <C>gemini</C>, when those providers are configured.
+            </li>
+          </ul>
+          <P>
+            <C>GET /models/resolve?ref=…</C> shows what a reference points to.
+          </P>
+
+          <SectionHeading id="models-pricing" level={3}>
+            Pricing and cost
+          </SectionHeading>
+          <P>
+            Cost is computed from the token usage the provider reports and the per-million-token prices you set on each model. LLMWatch ships
+            no price list, so a model without prices is shown as <i>unpriced</i> rather than $0. Eval runs store a snapshot of the prices
+            they ran with.
+          </P>
+
+          {/* ── Auth ────────────────────────────────────── */}
+          <SectionHeading id="auth-session">Accounts and sessions</SectionHeading>
+          <P>
+            Registering creates a workspace and makes you its owner. Every query is scoped to the caller&apos;s workspace. Log in to get a
+            JWT and send it as a bearer token:
+          </P>
+          <CodeBlock title="cURL">
+{`TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \\
   -H "Content-Type: application/json" \\
-  -d '{
-    "prompt": "Explain quantum computing in simple terms",
-    "model": "gemini"
-  }'`}
-            </CodeBlock>
-          </div>
+  -d '{"email": "you@example.com", "password": "…"}' | jq -r .access_token)
 
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">2. Check your analytics</h4>
-            <p className="text-sm text-muted-foreground mb-3">
-              View aggregated metrics for all your LLM calls:
-            </p>
-            <CodeBlock language="bash" title="cURL">
-{`curl http://localhost:8000/analytics/summary \\
-  -H "Authorization: Bearer YOUR_TOKEN"`}
-            </CodeBlock>
-          </div>
+curl http://localhost:8000/auth/me -H "Authorization: Bearer $TOKEN"`}
+          </CodeBlock>
 
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">3. Run an agent</h4>
-            <p className="text-sm text-muted-foreground mb-3">
-              Execute an autonomous ReAct agent with built-in tools and real-time streaming:
-            </p>
-            <CodeBlock language="bash" title="cURL">
+          <SectionHeading id="auth-api-keys" level={3}>
+            API keys
+          </SectionHeading>
+          <P>
+            For scripts and CI, create a key in <b>Settings</b> (it is shown once) and send it as <C>X-API-Key</C>. Keys can call everything
+            except key management itself, which needs a signed-in session.
+          </P>
+          <CodeBlock title="cURL">
+{`curl http://localhost:8000/analytics/summary?hours=24 -H "X-API-Key: lw_…"`}
+          </CodeBlock>
+
+          {/* ── Chat ────────────────────────────────────── */}
+          <SectionHeading id="chat-completions">Chat completions</SectionHeading>
+          <Endpoint method="POST" path="/chat/completions" />
+          <ParamTable
+            params={[
+              { name: 'model', type: 'string', required: true, description: 'A model reference' },
+              { name: 'prompt', type: 'string', required: false, description: 'A user message (prompt or messages is required)' },
+              { name: 'messages', type: '{role, content}[]', required: false, description: 'Conversation history; prompt is appended last' },
+              { name: 'system_prompt', type: 'string', required: false, description: 'System message' },
+              { name: 'temperature', type: 'number', required: false, description: '0 to 2' },
+              { name: 'max_tokens', type: 'integer', required: false, description: 'Output token limit' },
+              { name: 'top_p', type: 'number', required: false, description: '0 to 1' },
+              { name: 'thinking_mode', type: 'boolean', required: false, description: 'Let reasoning models think (default false)' },
+            ]}
+          />
+          <P>
+            The response has the text, any reasoning, token counts, latency, cost and whether the model was priced. Every call is logged,
+            failures included.
+          </P>
+
+          <SectionHeading id="chat-stream" level={3}>
+            Streaming
+          </SectionHeading>
+          <Endpoint method="POST" path="/chat/stream" />
+          <P>
+            Same body, answered as Server-Sent Events with one JSON object per <C>data:</C> line. Closing the connection stops the upstream
+            request and the partial call is still logged.
+          </P>
+          <CodeBlock language="text" title="Events">
+{`{"type": "start", "model_used", "model_id"}
+{"type": "reasoning", "text"}         reasoning text, when the provider sends it
+{"type": "delta", "text"}             answer text
+{"type": "usage", "input_tokens", "output_tokens", "reasoning_tokens"}
+{"type": "error", "error_type", "message"}
+{"type": "done", "latency_ms", "cost_usd", "priced", "finish_reason"}`}
+          </CodeBlock>
+
+          {/* ── Agent ───────────────────────────────────── */}
+          <SectionHeading id="agent-run">Run the agent</SectionHeading>
+          <Endpoint method="POST" path="/agent/run" />
+          <P>
+            A native tool-calling loop: the model calls tools, sees their results, and repeats until it answers or reaches{' '}
+            <C>max_iterations</C>. Use a model that supports tool calling.
+          </P>
+          <ParamTable
+            params={[
+              { name: 'prompt', type: 'string', required: true, description: 'The task' },
+              { name: 'model', type: 'string', required: true, description: 'A model reference' },
+              { name: 'tools', type: 'string[]', required: false, description: 'Defaults to every tool the server allows' },
+              { name: 'max_iterations', type: 'integer', required: false, description: 'Model calls before stopping, 1 to 20 (default 10)' },
+            ]}
+          />
+          <CodeBlock title="cURL">
 {`curl -N -X POST http://localhost:8000/agent/run \\
-  -H "Authorization: Bearer YOUR_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "prompt": "Search the web for the latest AI news and summarize it",
-    "model": "gemini",
-    "tools": ["web_search", "doc_analyze"]
-  }'`}
-            </CodeBlock>
-          </div>
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+  -d '{"prompt": "What did I spend on LLM calls today, by model?", "model": "default", "tools": ["query_usage"]}'`}
+          </CodeBlock>
 
-          {/* Installation */}
-          <SectionHeading id="installation" level={2}>
-            Installation
+          <SectionHeading id="agent-tools" level={3}>
+            Tools
           </SectionHeading>
+          <ul className="list-disc pl-6 mb-4 space-y-2 text-muted-foreground">
+            <li>
+              <C>web_search</C>: web search through DuckDuckGo.
+            </li>
+            <li>
+              <C>fetch_url</C>: fetches a page and extracts its text. Private, loopback, link-local and cloud metadata addresses are refused,
+              every redirect is re-checked, and the connection is pinned to the vetted IP. <C>FETCH_ALLOWED_HOSTS</C> narrows it further.
+            </li>
+            <li>
+              <C>query_usage</C>: answers questions about your own usage from the database (scoped to your workspace).
+            </li>
+            <li>
+              <C>python</C>: only registered when <C>ENABLE_CODE_EXECUTION=true</C>.
+            </li>
+          </ul>
+          <Callout>
+            The python tool runs code in an isolated interpreter with an empty environment, a temporary directory, CPU, memory and file limits
+            and a timeout. That reduces the damage a bad snippet can do, but it is <b>not a sandbox</b>: only enable it on a machine where
+            running untrusted code is acceptable.
+          </Callout>
 
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            LLMWatch runs as a Docker Compose stack with three services: the FastAPI backend,
-            the React frontend, and MLFlow for experiment tracking.
-          </p>
+          <SectionHeading id="agent-events" level={3}>
+            Events and traces
+          </SectionHeading>
+          <P>
+            The run streams <C>run_start</C>, <C>thinking</C> (a model call), <C>tool_call</C>, <C>tool_result</C>, <C>final_answer</C>,{' '}
+            <C>error</C> and <C>run_end</C> events, each with latency, tokens and cost where they apply. The whole run is saved as a trace
+            (also when it fails or is cancelled) and can be read from <C>GET /agent/traces/{'{run_id}'}</C>. Cancel with{' '}
+            <C>POST /agent/runs/{'{run_id}'}/cancel</C> or by closing the stream.
+          </P>
 
-          <h4 className="font-semibold mb-2 mt-6">Prerequisites</h4>
-          <ul className="list-disc list-inside text-muted-foreground space-y-1 mb-4">
-            <li>Docker and Docker Compose v2+</li>
-            <li>A Google Gemini API key (for Gemini model)</li>
-            <li>A vLLM endpoint with Qwen (for Qwen model) — or use Gemini only</li>
-            <li>AWS credentials for DynamoDB (or use Demo Mode without a database)</li>
+          {/* ── Evals ───────────────────────────────────── */}
+          <SectionHeading id="evals-suites">Suite format</SectionHeading>
+          <P>
+            A suite is a prompt template plus cases. <C>{'{{ variable }}'}</C> placeholders are filled from each case&apos;s <C>vars</C>; a
+            missing variable is an error, and templates cannot run code. Assertions on the suite apply to every case. Editing a suite saves a
+            new immutable version, and runs keep pointing at the version they ran.
+          </P>
+          <CodeBlock language="yaml" title="capitals.yaml">
+{`name: capitals
+description: One-word answers
+system_prompt: You are a concise assistant.
+prompt: |
+  Answer with one word: what is the capital of {{ country }}?
+assert:                       # applies to every case
+  - type: not_contains
+    value: "I'm not sure"
+cases:
+  - id: france
+    vars: {country: France}
+    expected: Paris
+    assert:
+      - {type: contains, value: Paris, case_sensitive: false}
+  - id: japan
+    vars: {country: Japan}
+    tags: [asia]
+    assert:
+      - {type: contains, value: Tokyo, case_sensitive: false}
+      - {type: latency_under, value: 5000, weight: 0.5}`}
+          </CodeBlock>
+          <P>
+            A case&apos;s score is the weighted mean of its assertion scores, and it passes only when every assertion passes. A complete
+            example lives in <C>examples/support-triage.yaml</C>.
+          </P>
+
+          <SectionHeading id="evals-evaluators" level={3}>
+            Evaluators
+          </SectionHeading>
+          <div className="rounded-xl border border-card-border overflow-x-auto my-4">
+            <table className="w-full text-sm">
+              <tbody>
+                {EVALUATORS.map(([type, desc]) => (
+                  <tr key={type} className="border-b border-card-border last:border-0 align-top">
+                    <td className="px-4 py-2.5 font-mono whitespace-nowrap">{type}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <P>
+            Each evaluator returns a score from 0 to 1, pass or fail, and a reason. <C>llm_judge</C> warns when the judge and the candidate
+            come from the same model family, since judges tend to favour their own family.
+          </P>
+
+          <SectionHeading id="evals-runs" level={3}>
+            Runs
+          </SectionHeading>
+          <P>
+            <C>POST /evals/runs</C> starts one run per variant (a model plus temperature, max tokens and thinking) with optional repeats,
+            concurrency and judge model. Runs execute in the background with bounded concurrency, a per-provider rate limit, and retries with
+            jittered backoff that honor <C>Retry-After</C>. Responses are cached by model, parameters, messages and repeat number, so
+            re-running an unchanged variant costs nothing. A run that was cancelled or cut short by a restart can be resumed.
+          </P>
+
+          <SectionHeading id="evals-compare" level={3}>
+            Comparisons
+          </SectionHeading>
+          <P>
+            <C>GET /evals/compare?baseline=…&amp;candidate=…</C> pairs results by case and repeat and reports:
+          </P>
+          <ul className="list-disc pl-6 mb-4 space-y-1 text-muted-foreground">
+            <li>the mean score delta with a 95% paired-bootstrap confidence interval (10,000 resamples, seeded),</li>
+            <li>pass-rate change with McNemar&apos;s test (exact below 25 discordant pairs, χ² with continuity correction above),</li>
+            <li>cost per case and latency deltas,</li>
+            <li>which cases regressed, were fixed or stayed the same.</li>
+          </ul>
+          <P>
+            The verdict is &quot;no significant difference&quot; unless a test says otherwise. With fewer than 10 paired cases the interval
+            is not used for significance, and the response carries warnings for that, for different suite versions and for unpriced models.
+            Mark a run as the suite&apos;s baseline to compare against it by default.
+          </P>
+
+          <SectionHeading id="evals-cli" level={3}>
+            CLI and CI
+          </SectionHeading>
+          <P>
+            The <C>llmwatch</C> command is installed with the backend. It works against the local database or, with <C>--server</C>, a
+            running instance.
+          </P>
+          <CodeBlock title="Terminal">
+{`llmwatch eval run examples/support-triage.yaml --model Ollama/qwen3:8b --set-baseline
+
+llmwatch eval run examples/support-triage.yaml --model OpenAI/gpt-4o-mini \\
+  --server https://llmwatch.example.com --api-key "$LLMWATCH_API_KEY" \\
+  --baseline <run-id> --fail-on-regression --json
+
+llmwatch eval compare <baseline-run-id> <candidate-run-id>`}
+          </CodeBlock>
+          <P>
+            Other options: <C>--param temperature=0</C>, <C>--repeats</C>, <C>--concurrency</C>, <C>--judge-model</C>,{' '}
+            <C>--embedding-model</C>, <C>--thinking</C>, <C>--no-cache</C>. Exit codes: <b>0</b> success, <b>1</b> significant regression
+            (with <C>--fail-on-regression</C>), <b>2</b> usage or configuration error.
+          </P>
+
+          {/* ── Analytics ───────────────────────────────── */}
+          <SectionHeading id="analytics-endpoints">Analytics</SectionHeading>
+          <P>
+            All analytics endpoints take a window as <C>?hours=24</C> or <C>?from=…&amp;to=…</C> (ISO 8601) and filters such as{' '}
+            <C>model</C>, <C>provider</C>, <C>status</C> and <C>source</C> (chat, agent, eval).
+          </P>
+          <ul className="list-disc pl-6 mb-4 space-y-1 text-muted-foreground">
+            <li>
+              <C>/analytics/summary</C>: requests, errors, p50/p95 latency, tokens, cost, per-model breakdown, and changes against the
+              previous window of the same length.
+            </li>
+            <li>
+              <C>/analytics/timeseries</C>: zero-filled buckets sized to the window.
+            </li>
+            <li>
+              <C>/analytics/logs</C>: the call log, newest first, with <C>q</C> to search prompts, responses and errors.
+            </li>
+            <li>
+              <C>/analytics/logs.csv</C>: the same filtered log as CSV.
+            </li>
           </ul>
 
-          <h4 className="font-semibold mb-2 mt-6">1. Clone and configure</h4>
-          <CodeBlock language="bash" title="Terminal">
-{`git clone https://github.com/your-org/llmwatch.git
-cd llmwatch
-
-# Copy the example environment file
-cp .env.example backend/.env
-
-# Edit backend/.env with your credentials
-# At minimum, set: GOOGLE_API_KEY, CORS_ORIGINS (SECRET_KEY is generated if unset)`}
-          </CodeBlock>
-
-          <h4 className="font-semibold mb-2 mt-6">2. Start the stack</h4>
-          <CodeBlock language="bash" title="Terminal">
-{`docker compose up -d
-
-# Services:
-#   Frontend  → http://localhost:3000
-#   Backend   → http://localhost:8000
-#   MLFlow    → http://localhost:5000`}
-          </CodeBlock>
-
-          <h4 className="font-semibold mb-2 mt-6">3. Local development (without Docker)</h4>
-          <CodeBlock language="bash" title="Terminal">
-{`# Backend
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -e ".[dev]"
-llmwatch serve --reload --port 8000
-
-# Frontend (in a separate terminal)
-cd frontend
-npm install
-npm run dev   # → http://localhost:5173`}
-          </CodeBlock>
-
-          {/* Demo Mode */}
-          <SectionHeading id="demo-mode" level={2}>
-            Demo Mode
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Demo mode allows you to explore the entire platform without configuring AWS
-            DynamoDB. When enabled, the login endpoint accepts hardcoded credentials and
-            returns a valid JWT token.
-          </p>
-
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">Enable demo mode</h4>
-            <p className="text-sm text-muted-foreground mb-3">
-              Set the following in your <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">backend/.env</code> file:
-            </p>
-            <CodeBlock language="env" title=".env">
-{`DEMO_MODE=true`}
-            </CodeBlock>
-            <p className="text-sm text-muted-foreground mt-3">
-              Demo mode is off by default and the server refuses to start with it when{' '}
-              <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">APP_ENV=production</code>.
-              The demo credentials are public, so never expose a demo instance to the internet.
-            </p>
-          </div>
-
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">Demo credentials</h4>
-            <ParamTable
-              params={[
-                { name: 'email', type: 'string', required: true, description: 'demo@llmwatch.dev (demo mode)' },
-                { name: 'password', type: 'string', required: true, description: 'llmwatch-demo (demo mode)' },
-              ]}
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              The demo user is assigned <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">user_id: demo-user-001</code> and{' '}
-              <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">company_id: demo-company-001</code>.
-              All authenticated endpoints work normally with the returned token.
-            </p>
-          </div>
-
-          {/* ─────────────────────────────────────────────── */}
-          {/* AUTHENTICATION                                  */}
-          {/* ─────────────────────────────────────────────── */}
-
-          <SectionHeading id="auth-overview" level={2}>
-            Authentication Overview
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            LLMWatch uses stateless JWT (JSON Web Tokens) for authentication. Tokens are
-            signed with HS256 and expire after 24 hours by default. All protected endpoints
-            require a valid token in the <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">Authorization</code> header.
-          </p>
-
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">Auth flow</h4>
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">1</span>
-                <span>Client calls <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">POST /auth/login</code> with email and password.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">2</span>
-                <span>Server validates credentials and returns a <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">TokenResponse</code> with the JWT.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">3</span>
-                <span>Client includes <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">Authorization: Bearer &lt;token&gt;</code> on all subsequent requests.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">4</span>
-                <span>Token is verified on each request. Expired or invalid tokens return <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">401 Unauthorized</code>.</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">JWT payload structure</h4>
-            <CodeBlock language="json" title="Decoded JWT payload">
-{`{
-  "sub": "demo-user-001",
-  "company_id": "demo-company-001",
-  "exp": 1741478400
-}`}
-            </CodeBlock>
-            <p className="text-xs text-muted-foreground mt-2">
-              The <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">sub</code> field is the user ID. The <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">company_id</code> ensures
-              multi-tenant data isolation — users can only access their own organization's data.
-            </p>
-          </div>
-
-          {/* Register */}
-          <SectionHeading id="auth-register" level={3}>
-            Register
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="POST" />
-            <code className="text-sm font-mono text-foreground">/auth/register</code>
-            <span className="text-xs text-muted-foreground ml-2">No auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Creates a new company and admin user account. Returns the assigned company ID.
-          </p>
-
-          <h4 className="font-semibold text-sm mb-2">Request body</h4>
-          <ParamTable
-            params={[
-              { name: 'email', type: 'EmailStr', required: true, description: 'Valid email address' },
-              { name: 'password', type: 'string', required: true, description: 'Minimum 8 characters' },
-              { name: 'company_name', type: 'string', required: true, description: 'Organization name' },
-            ]}
-          />
-
-          <CodeBlock language="bash" title="Example request">
-{`curl -X POST http://localhost:8000/auth/register \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "email": "user@example.com",
-    "password": "securepass123",
-    "company_name": "Acme Corp"
-  }'`}
-          </CodeBlock>
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "message": "User registered successfully",
-  "company_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}`}
-          </CodeBlock>
-
-          {/* Login */}
-          <SectionHeading id="auth-login" level={3}>
-            Login
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="POST" />
-            <code className="text-sm font-mono text-foreground">/auth/login</code>
-            <span className="text-xs text-muted-foreground ml-2">No auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Authenticates a user and returns a JWT token. In demo mode, accepts hardcoded
-            credentials without requiring a database.
-          </p>
-
-          <h4 className="font-semibold text-sm mb-2">Request body</h4>
-          <ParamTable
-            params={[
-              { name: 'email', type: 'EmailStr', required: true, description: 'Registered email address' },
-              { name: 'password', type: 'string', required: true, description: 'Account password' },
-            ]}
-          />
-
-          <CodeBlock language="bash" title="Example request">
-{`curl -X POST http://localhost:8000/auth/login \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "email": "demo@llmwatch.dev",
-    "password": "llmwatch-demo"
-  }'`}
-          </CodeBlock>
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "expires_in": 86400
-}`}
-          </CodeBlock>
-
-          {/* Using Tokens */}
-          <SectionHeading id="auth-tokens" level={3}>
-            Using Tokens
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Include the JWT token in the <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">Authorization</code> header
-            for all protected endpoints:
-          </p>
-
-          <CodeBlock language="bash" title="Authenticated request">
-{`curl http://localhost:8000/analytics/summary \\
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`}
-          </CodeBlock>
-
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">Protected endpoints</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              {[
-                'POST /chat/completions',
-                'GET /analytics/summary',
-                'GET /analytics/logs',
-                'GET /analytics/timeseries',
-                'POST /agent/run',
-                'GET /agent/traces',
-                'GET /agent/traces/:id',
-                'GET /agent/analytics',
-              ].map((ep) => (
-                <div key={ep} className="flex items-center gap-2 text-muted-foreground">
-                  <div className="w-1.5 h-1.5 rounded-full bg-error/60" />
-                  <code className="font-mono text-xs">{ep}</code>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="glass-card rounded-2xl p-6 my-6 border-error/20">
-            <h4 className="font-semibold mb-2 text-error">Error responses</h4>
-            <p className="text-sm text-muted-foreground mb-3">
-              Invalid or expired tokens return:
-            </p>
-            <CodeBlock language="json" title="401 Unauthorized">
-{`{
-  "error": "Token has expired",
-  "code": "AUTHENTICATION_FAILED"
-}`}
-            </CodeBlock>
-          </div>
-
-          {/* ─────────────────────────────────────────────── */}
-          {/* API REFERENCE                                   */}
-          {/* ─────────────────────────────────────────────── */}
-
-          <SectionHeading id="api-health" level={2}>
-            Health Check
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="GET" />
-            <code className="text-sm font-mono text-foreground">/health</code>
-            <span className="text-xs text-muted-foreground ml-2">No auth required</span>
-            <span className="text-xs text-warning ml-1">Rate limited: 10/min</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Returns application health status. Use this endpoint for load balancer health
-            probes and uptime monitoring.
-          </p>
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "status": "healthy",
-  "version": "0.1.0",
-  "timestamp": 1741392000.0,
-  "uptime_seconds": 3600.5
-}`}
-          </CodeBlock>
-
-          {/* Chat Completions */}
-          <SectionHeading id="api-chat" level={2}>
-            Chat Completions
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="POST" />
-            <code className="text-sm font-mono text-foreground">/chat/completions</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Send a prompt to the selected LLM model and receive a completion response with
-            latency, token counts, and cost metrics. Logs are automatically saved to DynamoDB
-            and MLFlow in the background.
-          </p>
-
-          <h4 className="font-semibold text-sm mb-2">Request body</h4>
-          <ParamTable
-            params={[
-              { name: 'prompt', type: 'string', required: true, description: 'The user prompt. Maximum 10,000 characters.' },
-              { name: 'model', type: '"qwen" | "gemini"', required: true, description: 'Target model. Must be exactly "qwen" or "gemini".' },
-              { name: 'thinking_mode', type: 'boolean', required: false, description: 'Enable chain-of-thought reasoning. Default: false.' },
-            ]}
-          />
-
-          <CodeBlock language="bash" title="Example request">
-{`curl -X POST http://localhost:8000/chat/completions \\
-  -H "Authorization: Bearer YOUR_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "prompt": "What are the benefits of microservices?",
-    "model": "gemini",
-    "thinking_mode": true
-  }'`}
-          </CodeBlock>
-
-          <h4 className="font-semibold text-sm mb-2 mt-6">Response fields</h4>
-          <ParamTable
-            params={[
-              { name: 'response', type: 'string', required: true, description: 'The generated completion text.' },
-              { name: 'thinking_content', type: 'string | null', required: false, description: 'Chain-of-thought reasoning (only when thinking_mode is true).' },
-              { name: 'latency_ms', type: 'float', required: true, description: 'Response time in milliseconds.' },
-              { name: 'input_tokens', type: 'integer', required: true, description: 'Number of prompt tokens consumed.' },
-              { name: 'output_tokens', type: 'integer', required: true, description: 'Number of completion tokens generated.' },
-              { name: 'cost_usd', type: 'float', required: true, description: 'Estimated cost in USD.' },
-              { name: 'model_used', type: 'string', required: true, description: 'Which model was used for the completion.' },
-              { name: 'thinking_mode', type: 'boolean', required: true, description: 'Whether thinking mode was active.' },
-            ]}
-          />
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "response": "Microservices offer several key benefits...",
-  "thinking_content": "Let me think about this systematically...",
-  "latency_ms": 1250.5,
-  "input_tokens": 12,
-  "output_tokens": 340,
-  "cost_usd": 0.001024,
-  "model_used": "gemini",
-  "thinking_mode": true
-}`}
-          </CodeBlock>
-
-          {/* Analytics Summary */}
-          <SectionHeading id="api-analytics-summary" level={2}>
-            Analytics Summary
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="GET" />
-            <code className="text-sm font-mono text-foreground">/analytics/summary</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Returns aggregated KPI metrics computed from your most recent 500 LLM call logs.
-            Includes total cost, average latency, request count, error rate, and per-model breakdown.
-          </p>
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "total_cost_usd": 12.456789,
-  "avg_latency_ms": 245.67,
-  "total_requests": 1250,
-  "error_rate_pct": 0.24,
-  "model_breakdown": {
-    "qwen": { "requests": 800, "cost": 4.12 },
-    "gemini": { "requests": 450, "cost": 8.34 }
-  }
-}`}
-          </CodeBlock>
-
-          {/* Analytics Logs */}
-          <SectionHeading id="api-analytics-logs" level={2}>
-            Analytics Logs
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="GET" />
-            <code className="text-sm font-mono text-foreground">/analytics/logs</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Returns raw invocation log entries. Supports filtering by model and pagination via limit.
-          </p>
-
-          <h4 className="font-semibold text-sm mb-2">Query parameters</h4>
-          <ParamTable
-            params={[
-              { name: 'limit', type: 'integer', required: false, description: 'Max entries to return. Default: 50.' },
-              { name: 'model', type: 'string', required: false, description: 'Filter by model name ("qwen", "gemini"). Default: "all".' },
-            ]}
-          />
-
-          <CodeBlock language="bash" title="Example request">
-{`curl "http://localhost:8000/analytics/logs?limit=10&model=gemini" \\
-  -H "Authorization: Bearer YOUR_TOKEN"`}
-          </CodeBlock>
-
-          <CodeBlock language="json" title="Response — 200 OK (truncated)">
-{`[
-  {
-    "log_id": "abc123",
-    "timestamp": "2026-03-07T12:00:00Z",
-    "prompt_preview": "What are the benefits...",
-    "response_preview": "Microservices offer...",
-    "model_name": "gemini",
-    "latency_ms": 1250.5,
-    "input_tokens": 12,
-    "output_tokens": 340,
-    "cost_usd": 0.001024,
-    "thinking_mode": true,
-    "success": true,
-    "error_type": null
-  }
-]`}
-          </CodeBlock>
-
-          {/* Analytics Timeseries */}
-          <SectionHeading id="api-analytics-timeseries" level={2}>
-            Analytics Timeseries
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="GET" />
-            <code className="text-sm font-mono text-foreground">/analytics/timeseries</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Returns metric arrays optimized for charting (compatible with Recharts AreaChart).
-            Each array index corresponds to the same log entry.
-          </p>
-
-          <h4 className="font-semibold text-sm mb-2">Query parameters</h4>
-          <ParamTable
-            params={[
-              { name: 'hours', type: 'integer', required: false, description: 'Time window in hours. Default: 24.' },
-            ]}
-          />
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "timestamps": ["2026-03-07T11:00:00Z", "2026-03-07T11:05:00Z"],
-  "costs": [0.0012, 0.0008],
-  "latencies": [1250.5, 890.2],
-  "request_counts": [1, 1]
-}`}
-          </CodeBlock>
-
-          {/* ─────────────────────────────────────────────── */}
-          {/* AGENT SYSTEM                                    */}
-          {/* ─────────────────────────────────────────────── */}
-
-          <SectionHeading id="agent-overview" level={2}>
-            Agent System
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            LLMWatch includes a built-in ReAct (Reasoning + Acting) agent that can execute
-            multi-step tasks using a set of tools. The agent streams its execution in real time
-            via Server-Sent Events (SSE), and every run is automatically traced for debugging
-            and analysis.
-          </p>
-
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">How it works</h4>
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">1</span>
-                <span>You send a prompt with selected tools and model via <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">POST /agent/run</code>.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">2</span>
-                <span>The agent reasons about the task, selects a tool, executes it, and observes the result.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">3</span>
-                <span>This think → act → observe loop repeats until the agent has a final answer or reaches max iterations.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 text-xs font-semibold">4</span>
-                <span>Every step is streamed to the client as an SSE event and stored as a trace.</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Run Agent */}
-          <SectionHeading id="agent-run" level={2}>
-            Run Agent
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="POST" />
-            <code className="text-sm font-mono text-foreground">/agent/run</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-            <span className="text-xs text-primary ml-1">SSE stream</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Executes a ReAct agent and streams execution events in real time. The response
-            is a <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">text/event-stream</code> SSE stream.
-          </p>
-
-          <h4 className="font-semibold text-sm mb-2">Request body</h4>
-          <ParamTable
-            params={[
-              { name: 'prompt', type: 'string', required: true, description: 'The task or question for the agent. Max 10,000 chars.' },
-              { name: 'model', type: '"qwen" | "gemini"', required: true, description: 'LLM model for the agent\'s reasoning.' },
-              { name: 'tools', type: 'string[]', required: false, description: 'Tools to enable. Default: all four tools. Options: "web_search", "code_execute", "db_query", "doc_analyze".' },
-              { name: 'max_iterations', type: 'integer', required: false, description: 'Max reasoning loops. Default: 10. Range: 1–20.' },
-            ]}
-          />
-
-          <CodeBlock language="bash" title="Example request">
-{`curl -N -X POST http://localhost:8000/agent/run \\
-  -H "Authorization: Bearer YOUR_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "prompt": "Calculate the factorial of 15 and then search for how factorials are used in probability",
-    "model": "gemini",
-    "tools": ["code_execute", "web_search"],
-    "max_iterations": 10
-  }'`}
-          </CodeBlock>
-
-          <CodeBlock language="text" title="SSE stream output">
-{`data: {"run_id":"abc-123","step_index":0,"event_type":"run_start","content":"Starting agent...","timestamp":"2026-03-07T12:00:00Z"}
-
-data: {"run_id":"abc-123","step_index":1,"event_type":"thinking","content":"I need to calculate 15!...","latency_ms":850,"tokens":45,"timestamp":"2026-03-07T12:00:01Z"}
-
-data: {"run_id":"abc-123","step_index":2,"event_type":"tool_call","content":"Calling execute_python","tool_name":"execute_python","tool_input":"import math\\nprint(math.factorial(15))","timestamp":"2026-03-07T12:00:01Z"}
-
-data: {"run_id":"abc-123","step_index":3,"event_type":"tool_result","content":"1307674368000","tool_name":"execute_python","latency_ms":120,"timestamp":"2026-03-07T12:00:01Z"}
-
-data: {"run_id":"abc-123","step_index":6,"event_type":"final_answer","content":"The factorial of 15 is 1,307,674,368,000...","timestamp":"2026-03-07T12:00:05Z"}
-
-data: {"run_id":"abc-123","step_index":7,"event_type":"run_end","content":"{\\"run_id\\":\\"abc-123\\",\\"total_steps\\":7,\\"total_latency_ms\\":5200,\\"total_tokens\\":380,\\"total_cost_usd\\":0.0015,\\"tools_used\\":[\\"execute_python\\",\\"web_search\\"],\\"model_used\\":\\"gemini\\",\\"success\\":true}","timestamp":"2026-03-07T12:00:05Z"}`}
-          </CodeBlock>
-
-          {/* Available Tools */}
-          <SectionHeading id="agent-tools" level={2}>
-            Available Tools
-          </SectionHeading>
-
-          <div className="space-y-4">
-            <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="px-2.5 py-0.5 rounded-md bg-primary/15 text-primary text-xs font-mono font-semibold border border-primary/20">web_search</span>
-                <span className="text-sm text-muted-foreground">Web Search</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">
-                Searches the web using DuckDuckGo and returns the top 5 results with titles,
-                snippets, and URLs. No API key required.
-              </p>
-              <div className="text-xs text-muted-foreground/60">
-                <strong>Input:</strong> <code className="font-mono">query</code> (string) — The search query.
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="px-2.5 py-0.5 rounded-md bg-primary/15 text-primary text-xs font-mono font-semibold border border-primary/20">code_execute</span>
-                <span className="text-sm text-muted-foreground">Python Code Executor</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">
-                Disabled by default; the server operator enables it with <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">ENABLE_CODE_EXECUTION=true</code>.
-                Runs Python in a child process of the backend with an empty environment, a throwaway
-                working directory and resource limits. It is not a sandbox: the code shares the
-                backend's filesystem and network. Code should use <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">print()</code> for output.
-              </p>
-              <div className="text-xs text-muted-foreground/60">
-                <strong>Input:</strong> <code className="font-mono">code</code> (string) — Python code to execute.<br />
-                <strong>Limits:</strong> 15s timeout (wall clock and CPU), 512 MB memory, 10KB max output.
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="px-2.5 py-0.5 rounded-md bg-primary/15 text-primary text-xs font-mono font-semibold border border-primary/20">db_query</span>
-                <span className="text-sm text-muted-foreground">LLM Usage Log Query</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">
-                Queries your organization's own LLM usage logs from DynamoDB. Returns cost
-                summaries, latency metrics, model breakdowns, and recent log entries. Multi-tenant
-                isolated — the agent can only access your company's data.
-              </p>
-              <div className="text-xs text-muted-foreground/60">
-                <strong>Input:</strong> <code className="font-mono">question</code> (string) — Natural language question about your usage.
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="px-2.5 py-0.5 rounded-md bg-primary/15 text-primary text-xs font-mono font-semibold border border-primary/20">doc_analyze</span>
-                <span className="text-sm text-muted-foreground">Document Analyzer</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">
-                Fetches a URL and extracts the visible text content. Handles HTML parsing,
-                encoding detection, and content truncation. Useful for analyzing web pages,
-                documentation, and articles.
-              </p>
-              <div className="text-xs text-muted-foreground/60">
-                <strong>Input:</strong> <code className="font-mono">url</code> (string) — HTTP/HTTPS URL to fetch.<br />
-                <strong>Limits:</strong> 500KB max download, 5,000 chars max returned, 15s timeout.
-              </div>
-            </div>
-          </div>
-
-          {/* SSE Streaming */}
-          <SectionHeading id="agent-sse" level={2}>
-            SSE Streaming
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            The agent endpoint uses Server-Sent Events for real-time streaming. Since the
-            standard <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">EventSource</code> API only supports GET requests,
-            you need to use <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">fetch()</code> with a <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">ReadableStream</code> for
-            POST-based SSE.
-          </p>
-
-          <CodeBlock language="typescript" title="Frontend SSE client example">
-{`async function streamAgent(token: string, prompt: string) {
-  const response = await fetch('/agent/run', {
-    method: 'POST',
-    headers: {
-      'Authorization': \`Bearer \${token}\`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      prompt,
-      model: 'gemini',
-      tools: ['web_search', 'code_execute'],
-    }),
-  });
-
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const event = JSON.parse(line.slice(6));
-        console.log(event.event_type, event.content);
-      }
-    }
-  }
-}`}
-          </CodeBlock>
-
-          <CodeBlock language="python" title="Python SSE client example">
-{`import requests
-import json
-
-def stream_agent(token: str, prompt: str):
-    response = requests.post(
-        "http://localhost:8000/agent/run",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "prompt": prompt,
-            "model": "gemini",
-            "tools": ["web_search", "code_execute"],
-        },
-        stream=True,
-    )
-
-    for line in response.iter_lines():
-        if line:
-            decoded = line.decode("utf-8")
-            if decoded.startswith("data: "):
-                event = json.loads(decoded[6:])
-                print(f"[{event['event_type']}] {event['content']}")`}
-          </CodeBlock>
-
-          {/* ─────────────────────────────────────────────── */}
-          {/* TRACING                                         */}
-          {/* ─────────────────────────────────────────────── */}
-
-          <SectionHeading id="tracing-overview" level={2}>
-            Tracing Overview
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Every agent execution is automatically traced. Traces capture every step — thinking,
-            tool calls, tool results, errors, and the final answer — with timestamps, latency,
-            token counts, and cost for each step.
-          </p>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Traces are stored per-run as a single item in DynamoDB, scoped to your
-            organization's <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">company_id</code> for
-            multi-tenant isolation.
-          </p>
-
-          {/* List Traces */}
-          <SectionHeading id="tracing-list" level={2}>
-            List Traces
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="GET" />
-            <code className="text-sm font-mono text-foreground">/agent/traces</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Returns recent agent traces (summary only, without the full step list).
-          </p>
-
-          <h4 className="font-semibold text-sm mb-2">Query parameters</h4>
-          <ParamTable
-            params={[
-              { name: 'limit', type: 'integer', required: false, description: 'Max traces to return. Default: 50.' },
-            ]}
-          />
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "traces": [
-    {
-      "run_id": "abc-123-def-456",
-      "timestamp": "2026-03-07T12:00:00Z",
-      "prompt": "Search the web for AI news",
-      "model_used": "gemini",
-      "tools_enabled": ["web_search", "doc_analyze"],
-      "tools_used": ["web_search"],
-      "total_steps": 5,
-      "total_latency_ms": 4200.0,
-      "total_tokens": 280,
-      "total_cost_usd": 0.0012,
-      "success": true,
-      "final_answer": "Here are the latest AI developments..."
-    }
-  ]
-}`}
-          </CodeBlock>
-
-          {/* Trace Detail */}
-          <SectionHeading id="tracing-detail" level={2}>
-            Trace Detail
-          </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="GET" />
-            <code className="text-sm font-mono text-foreground">/agent/traces/:run_id</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Returns the full trace for a specific agent run, including all step events.
-            Verifies company ownership to prevent cross-tenant access.
-          </p>
-
-          <CodeBlock language="json" title="Response — 200 OK (truncated)">
-{`{
-  "trace": {
-    "run_id": "abc-123-def-456",
-    "timestamp": "2026-03-07T12:00:00Z",
-    "prompt": "Search the web for AI news",
-    "model_used": "gemini",
-    "total_steps": 5,
-    "total_latency_ms": 4200.0,
-    "total_tokens": 280,
-    "total_cost_usd": 0.0012,
-    "success": true,
-    "final_answer": "Here are the latest AI developments...",
-    "steps": [
-      {
-        "step_index": 0,
-        "event_type": "run_start",
-        "content": "Starting agent...",
-        "timestamp": "2026-03-07T12:00:00Z"
-      },
-      {
-        "step_index": 1,
-        "event_type": "thinking",
-        "content": "I should search for recent AI news...",
-        "latency_ms": 920,
-        "tokens": 45,
-        "timestamp": "2026-03-07T12:00:01Z"
-      },
-      {
-        "step_index": 2,
-        "event_type": "tool_call",
-        "content": "Calling web_search",
-        "tool_name": "web_search",
-        "tool_input": "latest AI news March 2026",
-        "timestamp": "2026-03-07T12:00:01Z"
-      }
-    ]
-  }
-}`}
-          </CodeBlock>
-
-          {/* Event Types */}
-          <SectionHeading id="tracing-events" level={2}>
-            Event Types
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Each step in a trace has an <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">event_type</code> that
-            describes what happened at that step:
-          </p>
-
-          <div className="rounded-xl border border-card-border overflow-hidden my-4">
+          {/* ── Reference ───────────────────────────────── */}
+          <SectionHeading id="api-endpoints">All endpoints</SectionHeading>
+          <P>
+            Paths are relative to the API root: <C>http://localhost:8000</C> in development, <C>/api</C> behind the bundled nginx. Everything
+            except <C>/health</C>, register and login needs a bearer token or API key.
+          </P>
+          <div className="rounded-xl border border-card-border overflow-x-auto my-4">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-card-border bg-white/[0.02]">
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Event Type</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Description</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Key Fields</th>
-                </tr>
-              </thead>
               <tbody>
-                {[
-                  { type: 'run_start', desc: 'Agent execution begins', fields: 'content' },
-                  { type: 'thinking', desc: 'LLM reasoning step', fields: 'content, latency_ms, tokens, cost_usd' },
-                  { type: 'tool_call', desc: 'Agent invokes a tool', fields: 'content, tool_name, tool_input' },
-                  { type: 'tool_result', desc: 'Tool returns output', fields: 'content, tool_name, latency_ms' },
-                  { type: 'final_answer', desc: 'Agent produces final response', fields: 'content' },
-                  { type: 'error', desc: 'Error during execution', fields: 'content, tool_name (if tool error)' },
-                  { type: 'run_end', desc: 'Agent execution complete', fields: 'content (JSON AgentRunSummary)' },
-                ].map((e) => (
-                  <tr key={e.type} className="border-b border-card-border last:border-0">
-                    <td className="px-4 py-2.5">
-                      <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">{e.type}</code>
+                {ENDPOINTS.map(([method, path, desc]) => (
+                  <tr key={method + path} className="border-b border-card-border last:border-0">
+                    <td className="px-4 py-2 w-20">
+                      <MethodBadge method={method} />
                     </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{e.desc}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground/70 text-xs font-mono">{e.fields}</td>
+                    <td className="px-4 py-2 font-mono whitespace-nowrap">{path}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{desc}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* ─────────────────────────────────────────────── */}
-          {/* ANALYTICS                                       */}
-          {/* ─────────────────────────────────────────────── */}
-
-          <SectionHeading id="analytics-overview" level={2}>
-            Analytics Overview
+          <SectionHeading id="config-env" level={3}>
+            Configuration
           </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            LLMWatch provides two categories of analytics: <strong>LLM Call Analytics</strong> for
-            individual chat completion metrics, and <strong>Agent Analytics</strong> for agent
-            execution metrics. Both are scoped to your organization.
-          </p>
-
-          <div className="glass-card rounded-2xl p-6 my-6">
-            <h4 className="font-semibold mb-3">Available analytics endpoints</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-3">
-                <MethodBadge method="GET" />
-                <code className="font-mono text-xs text-foreground">/analytics/summary</code>
-                <span className="text-muted-foreground">— Aggregate KPIs</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <MethodBadge method="GET" />
-                <code className="font-mono text-xs text-foreground">/analytics/logs</code>
-                <span className="text-muted-foreground">— Raw log entries</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <MethodBadge method="GET" />
-                <code className="font-mono text-xs text-foreground">/analytics/timeseries</code>
-                <span className="text-muted-foreground">— Chart-ready time series</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <MethodBadge method="GET" />
-                <code className="font-mono text-xs text-foreground">/agent/analytics</code>
-                <span className="text-muted-foreground">— Agent execution metrics</span>
+          <P>
+            All settings are environment variables (or a <C>.env</C> file). None is required.
+          </P>
+          {ENV_GROUPS.map((group) => (
+            <div key={group.title} className="mb-6">
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <Settings size={14} className="text-muted-foreground" /> {group.title}
+              </h4>
+              <div className="rounded-xl border border-card-border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {group.vars.map(([name, def, desc]) => (
+                      <tr key={name} className="border-b border-card-border last:border-0 align-top">
+                        <td className="px-4 py-2 font-mono whitespace-nowrap">{name}</td>
+                        <td className="px-4 py-2 font-mono text-xs text-muted-foreground whitespace-nowrap">{def || '—'}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{desc}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
+          ))}
 
-          {/* Agent Analytics */}
-          <SectionHeading id="analytics-agent" level={2}>
-            Agent Analytics
+          <SectionHeading id="errors" level={3}>
+            Errors
           </SectionHeading>
-
-          <div className="flex items-center gap-3 mb-4">
-            <MethodBadge method="GET" />
-            <code className="text-sm font-mono text-foreground">/agent/analytics</code>
-            <span className="text-xs text-error ml-2">Auth required</span>
-          </div>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Returns aggregate metrics from up to 200 recent agent executions, including
-            success rate, average steps per run, tool usage distribution, and model breakdown.
-          </p>
-
-          <CodeBlock language="json" title="Response — 200 OK">
-{`{
-  "total_runs": 150,
-  "success_rate": 94.7,
-  "avg_steps": 4.2,
-  "avg_latency_ms": 3800.5,
-  "total_cost_usd": 0.185432,
-  "tool_usage": {
-    "web_search": 85,
-    "code_execute": 42,
-    "db_query": 30,
-    "doc_analyze": 15
-  },
-  "model_breakdown": {
-    "gemini": 120,
-    "qwen": 30
-  }
-}`}
-          </CodeBlock>
-
-          {/* ─────────────────────────────────────────────── */}
-          {/* CONFIGURATION                                   */}
-          {/* ─────────────────────────────────────────────── */}
-
-          <SectionHeading id="config-env" level={2}>
-            Environment Variables
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            All configuration is managed through environment variables loaded from
-            a <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">.env</code> file
-            in the backend directory. Copy <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">.env.example</code> to
-            get started.
-          </p>
-
-          <div className="rounded-xl border border-card-border overflow-hidden my-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-card-border bg-white/[0.02]">
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Variable</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Default</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Required</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { name: 'SECRET_KEY', def: 'generated', req: false, desc: 'Server secret (min 32 chars). Unset: generated once and stored in SECRET_KEY_FILE' },
-                  { name: 'JWT_ALGORITHM', def: 'HS256', req: false, desc: 'JWT signing algorithm' },
-                  { name: 'JWT_EXPIRE_HOURS', def: '24', req: false, desc: 'Token expiry in hours' },
-                  { name: 'GOOGLE_API_KEY', def: '—', req: true, desc: 'Google Gemini API key' },
-                  { name: 'QWEN_BASE_URL', def: '—', req: true, desc: 'vLLM endpoint URL for Qwen' },
-                  { name: 'QWEN_API_KEY', def: '—', req: true, desc: 'API key for Qwen vLLM endpoint' },
-                  { name: 'AWS_REGION', def: '—', req: true, desc: 'AWS region for DynamoDB' },
-                  { name: 'AWS_ACCESS_KEY_ID', def: '""', req: false, desc: 'AWS access key (optional with IAM roles)' },
-                  { name: 'AWS_SECRET_ACCESS_KEY', def: '""', req: false, desc: 'AWS secret key (optional with IAM roles)' },
-                  { name: 'DYNAMODB_TABLE_LOGS', def: '—', req: true, desc: 'DynamoDB table for LLM call logs' },
-                  { name: 'DYNAMODB_TABLE_USERS', def: '—', req: true, desc: 'DynamoDB table for user accounts' },
-                  { name: 'DYNAMODB_TABLE_TRACES', def: 'llmwatch_traces', req: false, desc: 'DynamoDB table for agent traces' },
-                  { name: 'MLFLOW_TRACKING_URI', def: '—', req: true, desc: 'MLFlow tracking server URL' },
-                  { name: 'CORS_ORIGINS', def: '—', req: true, desc: 'Comma-separated allowed CORS origins' },
-                  { name: 'DEMO_MODE', def: 'false', req: false, desc: 'Enable the public demo login (refused when APP_ENV=production)' },
-                  { name: 'APP_ENV', def: 'development', req: false, desc: 'Environment: development | production | testing' },
-                  { name: 'APP_VERSION', def: '0.1.0', req: false, desc: 'Application version string' },
-                ].map((v) => (
-                  <tr key={v.name} className="border-b border-card-border last:border-0">
-                    <td className="px-4 py-2.5 font-mono text-foreground text-xs">{v.name}</td>
-                    <td className="px-4 py-2.5 font-mono text-muted-foreground/70 text-xs">{v.def}</td>
-                    <td className="px-4 py-2.5">
-                      {v.req ? (
-                        <span className="text-error text-xs font-medium">Yes</span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">No</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground text-xs">{v.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <CodeBlock language="env" title="Example .env file">
-{`# Authentication
-SECRET_KEY=   # optional: openssl rand -hex 32
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_HOURS=24
-
-# LLM Providers
-GOOGLE_API_KEY=your-gemini-api-key
-QWEN_BASE_URL=http://your-vllm-endpoint:8080/v1
-QWEN_API_KEY=your-qwen-api-key
-
-# AWS / DynamoDB
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-DYNAMODB_TABLE_LOGS=llmwatch_logs
-DYNAMODB_TABLE_USERS=llmwatch_users
-DYNAMODB_TABLE_TRACES=llmwatch_traces
-
-# MLFlow
-MLFLOW_TRACKING_URI=http://localhost:5000
-
-# CORS
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173
-
-# App
-DEMO_MODE=false
-APP_ENV=development
-APP_VERSION=0.1.0`}
-          </CodeBlock>
-
-          {/* Docker Compose */}
-          <SectionHeading id="config-docker" level={2}>
-            Docker Compose
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            The production stack runs three services via Docker Compose:
-          </p>
-
-          <div className="rounded-xl border border-card-border overflow-hidden my-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-card-border bg-white/[0.02]">
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Service</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Port</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Image</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-card-border">
-                  <td className="px-4 py-2.5 font-mono text-foreground">backend</td>
-                  <td className="px-4 py-2.5 font-mono text-primary/80">8000</td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">python:3.11-slim (built)</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">FastAPI application server</td>
-                </tr>
-                <tr className="border-b border-card-border">
-                  <td className="px-4 py-2.5 font-mono text-foreground">frontend</td>
-                  <td className="px-4 py-2.5 font-mono text-primary/80">3000</td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">nginx:alpine (multi-stage)</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">React SPA served via Nginx</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 font-mono text-foreground">mlflow</td>
-                  <td className="px-4 py-2.5 font-mono text-primary/80">5000</td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">ghcr.io/mlflow/mlflow:v2.11.1</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">Experiment tracking (SQLite backend)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <CodeBlock language="bash" title="Common commands">
-{`# Start all services
-docker compose up -d
-
-# View logs
-docker compose logs -f backend
-
-# Rebuild after code changes
-docker compose up -d --build
-
-# Stop everything
-docker compose down`}
-          </CodeBlock>
-
-          {/* Model Configuration */}
-          <SectionHeading id="config-models" level={2}>
-            Model Configuration
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            LLMWatch uses a Strategy pattern to support multiple LLM providers. Currently
-            supported models:
-          </p>
-
-          <div className="space-y-4">
-            <div className="glass-card rounded-2xl p-6">
-              <h4 className="font-semibold mb-2">Gemini (managed)</h4>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p><strong>Model:</strong> Gemini 3 Flash</p>
-                <p><strong>Provider:</strong> Google Generative AI API</p>
-                <p><strong>Config:</strong> Set <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">GOOGLE_API_KEY</code> in your .env</p>
-                <p><strong>Thinking mode:</strong> Uses <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">thinking_level="high"</code> when enabled</p>
-                <p>
-                  <strong>Pricing:</strong> $0.50 / 1M input tokens, $3.00 / 1M output tokens
-                </p>
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-6">
-              <h4 className="font-semibold mb-2">Qwen (self-hosted)</h4>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p><strong>Model:</strong> Qwen3.5-35B-A3B</p>
-                <p><strong>Provider:</strong> vLLM with OpenAI-compatible API</p>
-                <p><strong>Config:</strong> Set <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">QWEN_BASE_URL</code> and <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">QWEN_API_KEY</code> in your .env</p>
-                <p><strong>Thinking mode:</strong> Parses <code className="text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded text-xs font-mono">&lt;think&gt;...&lt;/think&gt;</code> tags from response</p>
-                <p>
-                  <strong>Pricing:</strong> $0.10 / 1M tokens (combined input + output)
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ─────────────────────────────────────────────── */}
-          {/* Error Responses                                 */}
-          {/* ─────────────────────────────────────────────── */}
-
-          <SectionHeading id="error-responses" level={2}>
-            Error Responses
-          </SectionHeading>
-
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            All error responses follow a consistent format with a human-readable message
-            and a machine-readable error code:
-          </p>
-
-          <CodeBlock language="json" title="Error response format">
-{`{
-  "error": "Human-readable error message",
-  "code": "ERROR_CODE"
-}`}
-          </CodeBlock>
-
-          <div className="rounded-xl border border-card-border overflow-hidden my-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-card-border bg-white/[0.02]">
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">HTTP Status</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Code</th>
-                  <th className="text-left px-4 py-2.5 text-muted-foreground font-medium">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { status: '400', code: 'VALIDATION_ERROR', desc: 'Invalid request parameters or body' },
-                  { status: '401', code: 'AUTHENTICATION_FAILED', desc: 'Missing, invalid, or expired JWT token' },
-                  { status: '403', code: 'AUTHORIZATION_FAILED', desc: 'Insufficient permissions' },
-                  { status: '404', code: 'RESOURCE_NOT_FOUND', desc: 'Requested resource does not exist' },
-                  { status: '500', code: 'LLM_SERVICE_ERROR', desc: 'LLM provider returned an error' },
-                  { status: '500', code: 'DATABASE_ERROR', desc: 'DynamoDB operation failed' },
-                  { status: '500', code: 'INTERNAL_SERVER_ERROR', desc: 'Unhandled server error' },
-                ].map((e) => (
-                  <tr key={e.code} className="border-b border-card-border last:border-0">
-                    <td className="px-4 py-2.5 font-mono text-foreground">{e.status}</td>
-                    <td className="px-4 py-2.5">
-                      <code className="text-error/80 bg-error/10 px-1.5 py-0.5 rounded text-xs font-mono">{e.code}</code>
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{e.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Bottom spacer */}
-          <div className="h-32" />
+          <P>
+            Errors are JSON with an <C>error</C> message. Validation problems return 422 with details, missing or invalid credentials 401,
+            insufficient role 403, unknown resources 404, rate limits 429, and provider failures 502 with the provider&apos;s message.
+          </P>
+          <div className="h-24" />
         </main>
       </div>
     </div>
