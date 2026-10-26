@@ -174,3 +174,56 @@ async def recent_logs_for(workspace_id: str, limit: int = 100) -> list[LLMLog]:
     """Convenience for callers without a request session (e.g. agent tools)."""
     async with get_sessionmaker()() as session:
         return list(await LogRepository(session, workspace_id).recent(limit))
+
+
+async def start_trace(
+    workspace_id: str,
+    *,
+    run_id: str,
+    prompt: str,
+    model_name: str,
+    model_ref_id: str | None,
+    tools_enabled: list[str],
+    user_id: str | None,
+) -> bool:
+    """Records an agent run as "running" so it shows up while in flight."""
+    try:
+        async with get_sessionmaker()() as session:
+            TraceRepository(session, workspace_id).add(
+                AgentTrace(
+                    id=run_id,
+                    user_id=user_id,
+                    model_name=model_name,
+                    model_ref_id=model_ref_id,
+                    prompt=prompt,
+                    tools_enabled=tools_enabled,
+                    status="running",
+                )
+            )
+            await session.commit()
+            return True
+    except Exception:
+        logger.exception(
+            f"Failed to start agent trace (workspace={workspace_id}, run_id={run_id})"
+        )
+        return False
+
+
+async def finish_trace(workspace_id: str, run_id: str, **fields: Any) -> bool:
+    """Completes a trace started with start_trace (status, totals, steps, ...)."""
+    try:
+        async with get_sessionmaker()() as session:
+            trace = await TraceRepository(session, workspace_id).get(run_id)
+            if trace is None:
+                logger.error(f"Agent trace {run_id} vanished before it finished")
+                return False
+            for key, value in fields.items():
+                setattr(trace, key, value)
+            trace.finished_at = datetime.now(UTC)
+            await session.commit()
+            return True
+    except Exception:
+        logger.exception(
+            f"Failed to finish agent trace (workspace={workspace_id}, run_id={run_id})"
+        )
+        return False

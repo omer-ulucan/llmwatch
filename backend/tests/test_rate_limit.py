@@ -8,7 +8,6 @@ trusted when the peer is a configured proxy, otherwise clients can spoof it.
 """
 
 import hashlib
-from unittest.mock import MagicMock, patch
 
 import pytest
 from starlette.requests import Request
@@ -193,22 +192,12 @@ async def test_per_ip_limit_still_applies_across_identities(
     assert statuses == [200, 200, 200, 429]
 
 
-async def test_agent_run_is_rate_limited(client, make_account, monkeypatch):
-    async def fake_run_agent(**kwargs):
-        if False:
-            yield None
-
-    agent = MagicMock()
-    agent.run_agent = fake_run_agent
+async def test_agent_run_is_rate_limited(client, new_user, fake_llm, monkeypatch):
     monkeypatch.setattr(settings, "rate_limit_agent", "1/minute")
-    alice = await make_account()
-    body = {"prompt": "hi", "model": "gemini", "tools": []}
-    with (
-        patch("llmwatch.routers.agent.get_agent_service", return_value=agent),
-        patch("llmwatch.routers.agent.get_mlflow_service"),
-    ):
-        first = await client.post("/agent/run", json=body, headers=alice.headers)
-        second = await client.post("/agent/run", json=body, headers=alice.headers)
+    alice = await new_user()
+    body = {"prompt": "hi", "model": "fake-model", "tools": []}
+    first = await client.post("/agent/run", json=body, headers=alice.headers)
+    second = await client.post("/agent/run", json=body, headers=alice.headers)
     assert first.status_code == 200
     assert second.status_code == 429
 

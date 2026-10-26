@@ -146,9 +146,10 @@ def test_tools_endpoint_lists_only_enabled_tools(code_execution):
     }
     try:
         client = TestClient(app)
+        # The code tool is listed under its canonical name, "python".
         code_execution(False)
-        assert "code_execute" not in client.get("/agent/tools").json()["tools"]
+        assert "python" not in client.get("/agent/tools").json()["tools"]
         code_execution(True)
-        assert "code_execute" in client.get("/agent/tools").json()["tools"]
+        assert "python" in client.get("/agent/tools").json()["tools"]
     finally:
         app.dependency_overrides.clear()

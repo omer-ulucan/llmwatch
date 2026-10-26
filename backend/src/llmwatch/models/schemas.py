@@ -16,7 +16,9 @@ from pydantic import (
     model_validator,
 )
 
-from llmwatch.tools.registry import ALL_TOOLS, available_tools
+from llmwatch.agent.tools import ALIASES as TOOL_ALIASES
+from llmwatch.agent.tools import TOOL_NAMES, available_tool_names
+from llmwatch.agent.tools import canonical_name as canonical_tool_name
 
 
 class RegisterRequest(BaseModel):
@@ -149,40 +151,31 @@ class AgentRunRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    prompt: str = Field(..., max_length=10000)
-    model: str
-    tools: List[str] = Field(default_factory=available_tools)
-    max_iterations: int = 10
-
-    @field_validator("model")
-    @classmethod
-    def validate_model(cls, v: str) -> str:
-        if v not in ("qwen", "gemini"):
-            raise ValueError("Model must be 'qwen' or 'gemini'")
-        return v
+    prompt: str = Field(..., min_length=1, max_length=20_000)
+    # Any model reference: id, "Provider/model-id", "default", or legacy aliases.
+    model: str = Field(..., min_length=1, max_length=300)
+    # Defaults to every tool this server allows.
+    tools: List[str] = Field(default_factory=available_tool_names)
+    max_iterations: int = Field(10, ge=1, le=20)
 
     @field_validator("tools")
     @classmethod
     def validate_tools(cls, v: List[str]) -> List[str]:
+        known = set(TOOL_NAMES) | set(TOOL_ALIASES)
         for t in v:
-            if t not in ALL_TOOLS:
-                raise ValueError(f"Invalid tool: {t}. Must be one of {list(ALL_TOOLS)}")
-            if t not in available_tools():
+            if t not in known:
+                raise ValueError(
+                    f"Invalid tool: {t}. Must be one of {list(TOOL_NAMES)}"
+                )
+            if canonical_tool_name(t) not in available_tool_names():
                 raise ValueError(
                     f"Tool {t} is disabled on this server"
                     + (
                         " (set ENABLE_CODE_EXECUTION=true to enable it)"
-                        if t == "code_execute"
+                        if canonical_tool_name(t) == "python"
                         else ""
                     )
                 )
-        return v
-
-    @field_validator("max_iterations")
-    @classmethod
-    def validate_max_iterations(cls, v: int) -> int:
-        if v < 1 or v > 20:
-            raise ValueError("max_iterations must be between 1 and 20")
         return v
 
 

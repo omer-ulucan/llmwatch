@@ -10,11 +10,8 @@ make a call, then read it back through analytics / traces.
 
 import json
 import logging
-from unittest.mock import MagicMock, patch
 
 import pytest
-
-from llmwatch.services.tracing_service import AgentEvent, AgentRunSummary
 
 LATENCY_MS = 812.4375
 COST_USD = 0.000123456
@@ -123,56 +120,12 @@ async def test_log_storage_failure_is_logged_not_silent(
 # ── Agent traces ────────────────────────────────────────────
 
 
-def _fake_agent(run_id="run-1"):
-    async def run_agent(**kwargs):
-        yield AgentEvent(
-            run_id=run_id, step_index=0, event_type="run_start", content="go"
-        )
-        yield AgentEvent(
-            run_id=run_id,
-            step_index=1,
-            event_type="final_answer",
-            content="42",
-            latency_ms=LATENCY_MS,
-        )
-        summary = AgentRunSummary(
-            run_id=run_id,
-            total_steps=2,
-            total_latency_ms=LATENCY_MS,
-            total_tokens=21,
-            total_cost_usd=COST_USD,
-            tools_used=["web_search"],
-            model_used="gemini",
-            success=True,
-        )
-        yield AgentEvent(
-            run_id=run_id,
-            step_index=2,
-            event_type="run_end",
-            content=summary.model_dump_json(),
-        )
-
-    agent = MagicMock()
-    agent.run_agent = run_agent
-    return agent
-
-
-async def _run_agent(client, account, run_id="run-1"):
-    with (
-        patch(
-            "llmwatch.routers.agent.get_agent_service", return_value=_fake_agent(run_id)
-        ),
-        patch("llmwatch.routers.agent.get_mlflow_service"),
-    ):
-        resp = await client.post(
-            "/agent/run",
-            json={
-                "prompt": "meaning of life?",
-                "model": "gemini",
-                "tools": ["web_search"],
-            },
-            headers=account.headers,
-        )
+async def _run_agent(client, account):
+    resp = await client.post(
+        "/agent/run",
+        json={"prompt": "meaning of life?", "model": "fake-model", "tools": []},
+        headers=account.headers,
+    )
     assert resp.status_code == 200
     events = [
         json.loads(line[6:])
@@ -180,48 +133,48 @@ async def _run_agent(client, account, run_id="run-1"):
         if line.startswith("data: ")
     ]
     assert events[-1]["event_type"] == "run_end"
-    return events
+    return events[0]["run_id"]
 
 
-async def test_agent_run_is_persisted_and_listed(client, make_account):
-    acct = await make_account()
-    await _run_agent(client, acct)
+async def test_agent_run_is_persisted_and_listed(client, chat_account):
+    acct = await chat_account()
+    run_id = await _run_agent(client, acct)
 
-    traces = (await client.get("/agent/traces", headers=acct.headers)).json()["traces"]
-    (trace,) = traces
-    assert trace["run_id"] == "run-1"
+    (trace,) = (await client.get("/agent/traces", headers=acct.headers)).json()[
+        "traces"
+    ]
+    assert trace["run_id"] == run_id
     assert trace["prompt"] == "meaning of life?"
-    assert trace["model_used"] == "gemini"
-    assert trace["tools_used"] == ["web_search"]
-    assert trace["total_latency_ms"] == pytest.approx(LATENCY_MS)
-    assert trace["total_cost_usd"] == pytest.approx(COST_USD)
+    assert trace["model_used"] == "Fake/fake-model"
+    assert isinstance(trace["total_latency_ms"], float)
+    assert trace["total_cost_usd"] == pytest.approx(CHAT_COST_USD)
     assert trace["success"] is True
     assert "steps" not in trace  # list view stays light
 
-    detail = (await client.get("/agent/traces/run-1", headers=acct.headers)).json()
-    assert detail["trace"]["run_id"] == "run-1"
-    assert "steps" in detail["trace"]
+    detail = (await client.get(f"/agent/traces/{run_id}", headers=acct.headers)).json()
+    assert detail["trace"]["run_id"] == run_id
+    assert detail["trace"]["final_answer"] == "Paris is the capital of France."
+    assert detail["trace"]["steps"]
 
 
-async def test_agent_analytics_reads_persisted_traces(client, make_account):
-    acct = await make_account()
-    await _run_agent(client, acct, "run-1")
-    await _run_agent(client, acct, "run-2")
+async def test_agent_analytics_reads_persisted_traces(client, chat_account):
+    acct = await chat_account()
+    await _run_agent(client, acct)
+    await _run_agent(client, acct)
 
     stats = (await client.get("/agent/analytics", headers=acct.headers)).json()
     assert stats["total_runs"] == 2
     assert stats["success_rate"] == 100.0
-    assert stats["total_cost_usd"] == pytest.approx(2 * COST_USD)
-    assert stats["tool_usage"] == {"web_search": 2}
+    assert stats["total_cost_usd"] == pytest.approx(2 * CHAT_COST_USD)
 
 
-async def test_traces_are_isolated_per_workspace(client, make_account):
-    alice = await make_account(workspace="A")
-    bob = await make_account(workspace="B")
-    await _run_agent(client, alice)
+async def test_traces_are_isolated_per_workspace(client, chat_account):
+    alice = await chat_account(workspace="A")
+    bob = await chat_account(workspace="B")
+    run_id = await _run_agent(client, alice)
 
     assert (await client.get("/agent/traces", headers=bob.headers)).json() == {
         "traces": []
     }
-    resp = await client.get("/agent/traces/run-1", headers=bob.headers)
+    resp = await client.get(f"/agent/traces/{run_id}", headers=bob.headers)
     assert resp.status_code == 404

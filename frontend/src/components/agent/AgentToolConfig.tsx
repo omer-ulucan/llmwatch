@@ -16,9 +16,9 @@ interface ToolOption {
 
 const TOOLS: ToolOption[] = [
   { id: 'web_search', name: 'Web Search', description: 'Search the web via DuckDuckGo', icon: <Search size={16} /> },
-  { id: 'code_execute', name: 'Code Execute', description: 'Run Python code (opt-in on the server)', icon: <Code size={16} /> },
-  { id: 'db_query', name: 'DB Query', description: 'Query your LLM usage logs', icon: <Database size={16} /> },
-  { id: 'doc_analyze', name: 'Doc Analyze', description: 'Fetch & analyze a URL', icon: <FileText size={16} /> },
+  { id: 'fetch_url', name: 'Fetch URL', description: 'Read a public web page', icon: <FileText size={16} /> },
+  { id: 'query_usage', name: 'Usage Query', description: 'Summarise your own LLM usage', icon: <Database size={16} /> },
+  { id: 'python', name: 'Python', description: 'Run Python code (opt-in on the server)', icon: <Code size={16} /> },
 ];
 
 interface AgentToolConfigProps {
