@@ -121,7 +121,11 @@ async def test_missing_usage_is_reported_as_such(client, account_with, fake_llm)
         ("openai", False, True, None, False),  # never sent to non-reasoning models
         ("vllm", True, False, None, True),
         ("vllm", True, True, None, False),
+        # Ollama thinks by default; "none" is what turns it off (checked against
+        # Ollama 0.18; "low" and think=false do not).
         ("ollama", True, True, None, False),
+        ("ollama", True, False, "none", False),
+        ("ollama", False, False, None, False),
     ],
 )
 async def test_reasoning_knobs_per_provider(
