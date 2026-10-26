@@ -6,12 +6,11 @@ All fetching goes through security.ssrf.safe_fetch, which blocks internal addres
 """
 
 import asyncio
-import re
-from html.parser import HTMLParser
 
 import httpx
 from langchain_core.tools import tool
 
+from llmwatch.agent.html import extract_text_from_html
 from llmwatch.config import logger, settings
 from llmwatch.security.ssrf import BlockedURLError, parse_allowed_hosts, safe_fetch
 
@@ -21,44 +20,8 @@ MAX_CONTENT_CHARS = 5000
 REQUEST_TIMEOUT = 15
 
 
-class _HTMLTextExtractor(HTMLParser):
-    """Simple HTML parser that extracts visible text content."""
-
-    def __init__(self):
-        super().__init__()
-        self.result = []
-        self._skip = False
-        self._skip_tags = {"script", "style", "head", "meta", "link", "noscript"}
-
-    def handle_starttag(self, tag, attrs):
-        if tag.lower() in self._skip_tags:
-            self._skip = True
-
-    def handle_endtag(self, tag):
-        if tag.lower() in self._skip_tags:
-            self._skip = False
-
-    def handle_data(self, data):
-        if not self._skip:
-            text = data.strip()
-            if text:
-                self.result.append(text)
-
-    def get_text(self) -> str:
-        return " ".join(self.result)
-
-
-def _extract_text_from_html(html: str) -> str:
-    """Extract visible text content from HTML."""
-    extractor = _HTMLTextExtractor()
-    try:
-        extractor.feed(html)
-        return extractor.get_text()
-    except Exception:
-        # Fallback: strip tags with regex
-        clean = re.sub(r"<[^>]+>", " ", html)
-        clean = re.sub(r"\s+", " ", clean)
-        return clean.strip()
+# Kept under the old name for existing callers.
+_extract_text_from_html = extract_text_from_html
 
 
 @tool

@@ -105,6 +105,11 @@ def execute_python(code: str) -> str:
     """Execute Python code and return what it prints.
     Use this tool when you need to perform calculations, data analysis, or run Python scripts.
     The code should use print() to output results."""
+    return run_python(code)
+
+
+def run_python(code: str) -> str:
+    """Runs code with the hardening above and returns its output or an error text."""
     # WHY: Checked at call time as well as when tools are built (defense in depth).
     if not settings.enable_code_execution:
         return DISABLED_MESSAGE
