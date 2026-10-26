@@ -205,7 +205,7 @@ const ENV_GROUPS: { title: string; vars: [string, string, string][] }[] = [
   {
     title: 'Access',
     vars: [
-      ['ALLOW_SIGNUP', 'true', 'Turn off after creating your account to close registration'],
+      ['ALLOW_SIGNUP', 'true', 'When false, only the first account can register (bootstrap, then closed)'],
       ['DEMO_MODE', 'false', 'Seed a demo user (refused when APP_ENV=production)'],
       ['DEMO_EMAIL / DEMO_PASSWORD', 'demo@llmwatch.dev / llmwatch-demo', 'Demo credentials'],
       ['CORS_ORIGINS', '', 'Comma-separated origins, only needed when the UI is on another origin'],
@@ -216,11 +216,11 @@ const ENV_GROUPS: { title: string; vars: [string, string, string][] }[] = [
     title: 'Security',
     vars: [
       ['ENABLE_CODE_EXECUTION', 'false', 'Register the agent\'s python tool (resource-limited, not a sandbox)'],
-      ['FETCH_ALLOWED_HOSTS', '', 'If set, fetch_url only reaches these hosts'],
+      ['FETCH_ALLOWED_HOSTS', '', 'Hosts fetch_url may reach even though they resolve to private addresses (e.g. an intranet wiki)'],
       ['TRUSTED_PROXIES', '', 'CIDRs whose X-Forwarded-For is trusted (compose sets the Docker networks)'],
       ['RATE_LIMIT_ENABLED', 'true', 'Per-user/key/IP rate limits'],
       ['RATE_LIMIT_CHAT / RATE_LIMIT_AGENT', '60/minute / 10/minute', 'Limits for chat and agent runs'],
-      ['RATE_LIMIT_PER_IP', '300/minute', 'Default limit for other endpoints'],
+      ['RATE_LIMIT_PER_IP', '300/minute', 'Per client IP on the chat and agent routes, across all users and keys'],
       ['RATE_LIMIT_STORAGE_URI', 'memory://', 'Use redis://… when running several workers'],
     ],
   },
@@ -588,9 +588,10 @@ npm run dev                             # http://localhost:3000, proxies /api to
             Ollama and local models
           </SectionHeading>
           <P>
-            Set <C>OLLAMA_BASE_URL=http://localhost:11434/v1</C> (or add an Ollama provider in the UI) and discover models. From inside Docker,
-            use an address the container can reach, such as <C>http://host.docker.internal:11434/v1</C>. Reasoning models are told not to
-            think unless thinking is turned on, so short answers are not lost to hidden reasoning.
+            Set <C>OLLAMA_BASE_URL=http://localhost:11434/v1</C> (or add an Ollama provider in the UI) and discover models. With Docker
+            Compose, use <C>http://host.docker.internal:11434/v1</C> and start Ollama with <C>OLLAMA_HOST=0.0.0.0</C>, since by default it
+            only listens on loopback, which containers cannot reach. Reasoning models are told not to think unless thinking is turned on, so
+            short answers are not lost to hidden reasoning.
           </P>
 
           <SectionHeading id="models-refs" level={3}>
@@ -716,7 +717,7 @@ curl http://localhost:8000/auth/me -H "Authorization: Bearer $TOKEN"`}
             </li>
             <li>
               <C>fetch_url</C>: fetches a page and extracts its text. Private, loopback, link-local and cloud metadata addresses are refused,
-              every redirect is re-checked, and the connection is pinned to the vetted IP. <C>FETCH_ALLOWED_HOSTS</C> narrows it further.
+              every redirect is re-checked, and the connection is pinned to the vetted IP. Hosts in <C>FETCH_ALLOWED_HOSTS</C> are exempt from the private-address check.
             </li>
             <li>
               <C>query_usage</C>: answers questions about your own usage from the database (scoped to your workspace).
@@ -840,7 +841,7 @@ llmwatch eval run examples/support-triage.yaml --model OpenAI/gpt-4o-mini \\
 llmwatch eval compare <baseline-run-id> <candidate-run-id>`}
           </CodeBlock>
           <P>
-            Other options: <C>--param temperature=0</C>, <C>--repeats</C>, <C>--concurrency</C>, <C>--judge-model</C>,{' '}
+            <C>--baseline</C> takes a run id or <C>suite</C> for the suite&apos;s baseline. Other options: <C>--param temperature=0</C>, <C>--repeats</C>, <C>--concurrency</C>, <C>--judge-model</C>,{' '}
             <C>--embedding-model</C>, <C>--thinking</C>, <C>--no-cache</C>. Exit codes: <b>0</b> success, <b>1</b> significant regression
             (with <C>--fail-on-regression</C>), <b>2</b> usage or configuration error.
           </P>
