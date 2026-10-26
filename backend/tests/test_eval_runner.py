@@ -644,3 +644,50 @@ async def test_delete_run(setup, client, fake_llm):
     assert (
         await client.get(f"/evals/runs/{run_id}", headers=acct.headers)
     ).status_code == 404
+
+
+# ── Reasoning controls ──────────────────────────────────────
+
+
+async def test_runs_turn_reasoning_off_like_chat(
+    client, make_account, add_model, fake_llm
+):
+    """Regression: the runner sent no reasoning controls, so Ollama reasoning models
+    spent max_tokens on hidden reasoning and every output was empty."""
+    acct = await make_account()
+    await add_model(acct, preset="ollama", supports_reasoning=True)
+    suite = (
+        await client.post(
+            "/evals/suites/import", json={"content": SUITE}, headers=acct.headers
+        )
+    ).json()
+
+    (run_id,) = await _new_run(acct, suite)
+    await RunExecutor(run_id, acct.workspace_id).execute()
+    assert {r.get("reasoning_effort") for r in fake_llm.requests} == {"none"}
+
+    fake_llm.requests.clear()
+    (thinking_run,) = await _new_run(
+        acct, suite, variants=[VariantSpec("fake-model", {}, thinking=True)]
+    )
+    await RunExecutor(thinking_run, acct.workspace_id).execute()
+    assert fake_llm.requests  # different request -> not served from the cache
+    assert all("reasoning_effort" not in r for r in fake_llm.requests)
+
+
+async def test_vllm_runs_get_the_no_think_switch(
+    client, make_account, add_model, fake_llm
+):
+    acct = await make_account()
+    await add_model(acct, preset="vllm", supports_reasoning=True)
+    suite = (
+        await client.post(
+            "/evals/suites/import", json={"content": SUITE}, headers=acct.headers
+        )
+    ).json()
+    (run_id,) = await _new_run(acct, suite)
+    await RunExecutor(run_id, acct.workspace_id).execute()
+    assert all(
+        r["messages"][0] == {"role": "system", "content": "/no_think"}
+        for r in fake_llm.requests
+    )
