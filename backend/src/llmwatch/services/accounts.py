@@ -5,6 +5,8 @@ WHY: Keeps account rules (email normalisation, signup policy, timing-safe login)
 one place, shared by the HTTP routes and startup seeding.
 """
 
+from pathlib import Path
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -121,6 +123,26 @@ async def ensure_demo_account(session: AsyncSession) -> User:
     from llmwatch.providers.service import sync_env_providers
 
     await sync_env_providers(session, workspace.id)
+    await _seed_example_suite(session, workspace.id)
     await session.commit()
     logger.info(f"Demo account created: {email}")
     return user
+
+
+EXAMPLE_SUITE = (
+    Path(__file__).resolve().parent.parent
+    / "evals"
+    / "examples"
+    / "support-triage.yaml"
+)
+
+
+async def _seed_example_suite(session: AsyncSession, workspace_id: str) -> None:
+    """Gives the demo workspace the bundled example eval suite."""
+    from llmwatch.evals import suites as suite_service
+    from llmwatch.evals.schema import parse_suite
+
+    definition = parse_suite(EXAMPLE_SUITE.read_text())
+    repo = suite_service.SuiteRepository(session, workspace_id)
+    if await repo.by_name(definition.name) is None:
+        await suite_service.create_suite(session, workspace_id, definition)
