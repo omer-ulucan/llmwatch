@@ -33,6 +33,8 @@ export default tseslint.config(
           ignoreRestSiblings: true,
         },
       ],
+      // Dialogs and toasts replace the browser's blocking popups.
+      "no-alert": "error",
     },
   },
 );
