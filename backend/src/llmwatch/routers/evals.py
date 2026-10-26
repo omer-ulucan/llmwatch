@@ -17,6 +17,7 @@ from llmwatch.db.engine import get_session
 from llmwatch.db.models import EvalCase, EvalResult, EvalRun, EvalSuite
 from llmwatch.evals import runner
 from llmwatch.evals import suites as suite_service
+from llmwatch.evals.compare import compare_runs
 from llmwatch.evals.messages import build_messages
 from llmwatch.evals.schema import (
     SuiteDefinition,
@@ -464,3 +465,57 @@ async def delete_run(
     await session.delete(run)
     await session.commit()
     return Response(status_code=204)
+
+
+# ── Comparison and baselines ────────────────────────────────
+
+
+@router.get("/compare")
+async def compare(
+    candidate: str,
+    baseline: str | None = None,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Compares a candidate run with a baseline run of the same suite (the suite's
+    marked baseline if `baseline` is omitted): paired bootstrap CI for the score
+    delta, McNemar test for pass/fail, cost and latency deltas, per-case changes.
+    """
+    workspace_id = current_user["workspace_id"]
+    if baseline is None:
+        cand = await _get_run(session, workspace_id, candidate)
+        suite = await session.get(EvalSuite, cand.suite_id)
+        if suite is None or suite.baseline_run_id is None:
+            raise ValidationException(
+                "No baseline given and the suite has no baseline run marked"
+            )
+        baseline = suite.baseline_run_id
+    return await compare_runs(session, workspace_id, baseline, candidate)
+
+
+class BaselineBody(BaseModel):
+    run_id: str | None = None
+
+
+@router.put("/suites/{suite_id}/baseline")
+async def set_baseline(
+    suite_id: str,
+    body: BaselineBody,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Marks a run as the suite's baseline (or clears it with run_id null)."""
+    workspace_id = current_user["workspace_id"]
+    suite = await suite_service.SuiteRepository(session, workspace_id).get(suite_id)
+    if suite is None:
+        raise ResourceNotFoundException("Suite not found")
+    if body.run_id is not None:
+        run = await _get_run(session, workspace_id, body.run_id)
+        if run.suite_id != suite.id:
+            raise ValidationException("That run belongs to another suite")
+        if run.status != "completed":
+            raise ValidationException("Only completed runs can be the baseline")
+    suite.baseline_run_id = body.run_id
+    await session.commit()
+    return _suite_out(suite)
