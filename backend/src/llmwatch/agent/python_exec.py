@@ -1,6 +1,6 @@
 """
-Module: code_executor.py
-Purpose: Opt-in Python code execution tool for the LLMWatch agent.
+Module: python_exec.py
+Purpose: Opt-in Python code execution for the agent's `python` tool.
 WHY: Lets the agent run Python for calculations and data wrangling.
 
 WARNING: This is NOT a sandbox. The code runs as a child process of the backend, as
@@ -16,8 +16,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-
-from langchain_core.tools import tool
 
 from llmwatch.config import logger, settings
 
@@ -38,8 +36,8 @@ DISABLED_MESSAGE = (
 )
 
 # WHY: Limits are applied by the child itself before user code runs, instead of via
-# subprocess preexec_fn, which is unsafe when the parent has threads (this tool runs
-# in a worker thread). Soft == hard, so user code cannot raise them again.
+# subprocess preexec_fn, which is unsafe when the parent has threads (this runs in a
+# worker thread). Soft == hard, so user code cannot raise them again.
 _LAUNCHER = """
 import resource, runpy, sys
 def _limit(name, value):
@@ -98,14 +96,6 @@ def _run_isolated(code: str, timeout: int) -> subprocess.CompletedProcess[str]:
             proc.communicate()
             raise
         return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr)
-
-
-@tool
-def execute_python(code: str) -> str:
-    """Execute Python code and return what it prints.
-    Use this tool when you need to perform calculations, data analysis, or run Python scripts.
-    The code should use print() to output results."""
-    return run_python(code)
 
 
 def run_python(code: str) -> str:

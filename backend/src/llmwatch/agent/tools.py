@@ -277,15 +277,15 @@ QUERY_USAGE = Tool(
 
 
 async def _python(args: dict[str, Any], ctx: ToolContext) -> ToolResult:
-    from llmwatch.tools import code_executor
+    from llmwatch.agent import python_exec
 
     # WHY: Checked again at call time (defense in depth).
     if not settings.enable_code_execution:
-        return ToolResult(code_executor.DISABLED_MESSAGE, is_error=True)
+        return ToolResult(python_exec.DISABLED_MESSAGE, is_error=True)
     code = str(args.get("code") or "")
     if not code.strip():
         return ToolResult("Error: `code` is required", is_error=True)
-    output = await asyncio.to_thread(code_executor.run_python, code)
+    output = await asyncio.to_thread(python_exec.run_python, code)
     is_error = output.startswith(
         ("Error:", "Code execution error", "Code execution failed")
     )
