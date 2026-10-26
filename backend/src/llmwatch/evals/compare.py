@@ -20,6 +20,11 @@ from llmwatch.evals.stats import mcnemar, paired_bootstrap, relative_change
 from llmwatch.exceptions import ResourceNotFoundException, ValidationException
 
 ALPHA = 0.05
+# WHY: Percentile bootstrap intervals under-cover on tiny samples (with 3 cases that
+# all moved the same way the interval collapses to a single point), so the bootstrap
+# never declares significance below this. McNemar's exact test stays valid and can
+# still decide on its own.
+MIN_PAIRED_FOR_BOOTSTRAP = 10
 
 
 @dataclass
@@ -86,6 +91,14 @@ def _run_info(run: EvalRun) -> dict[str, Any]:
     }
 
 
+def _priced(run: EvalRun) -> bool:
+    snap = run.pricing_snapshot or {}
+    return (
+        snap.get("input_price_per_mtok") is not None
+        or snap.get("output_price_per_mtok") is not None
+    )
+
+
 def _mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
@@ -128,7 +141,20 @@ async def compare_runs(
     base_lat = _mean([base_cases[k].latency for k in paired])
     cand_lat = _mean([cand_cases[k].latency for k in paired])
 
-    if boot.significant:
+    warnings: list[str] = []
+    score_significant = boot.significant and len(paired) >= MIN_PAIRED_FOR_BOOTSTRAP
+    if len(paired) < MIN_PAIRED_FOR_BOOTSTRAP:
+        warnings.append(
+            f"Only {len(paired)} paired cases: the score interval is unreliable below "
+            f"{MIN_PAIRED_FOR_BOOTSTRAP}, so only the pass/fail test can show "
+            "significance. Add cases (or repeats) for a firmer answer."
+        )
+    if not (_priced(baseline) and _priced(candidate)):
+        warnings.append(
+            "At least one run's model is unpriced; cost deltas are incomplete."
+        )
+
+    if score_significant:
         verdict = "improved" if boot.mean > 0 else "regressed"
     elif test.significant(ALPHA):
         verdict = "improved" if len(fixes) > len(regressions) else "regressed"
@@ -172,7 +198,7 @@ async def compare_runs(
             "ci_high": boot.high,
             "confidence": boot.confidence,
             "resamples": boot.resamples,
-            "significant": boot.significant,
+            "significant": score_significant,
             "method": "paired bootstrap (percentile)",
         },
         "pass_rate": {
@@ -191,10 +217,8 @@ async def compare_runs(
             "candidate_per_case": cand_cost,
             "delta_per_case": (cand_cost or 0) - (base_cost or 0),
             "delta_pct": relative_change(cand_cost, base_cost),
-            "baseline_priced": baseline.pricing_snapshot.get("input_price_per_mtok")
-            is not None,
-            "candidate_priced": candidate.pricing_snapshot.get("input_price_per_mtok")
-            is not None,
+            "baseline_priced": _priced(baseline),
+            "candidate_priced": _priced(candidate),
         },
         "latency": {
             "baseline_mean_ms": base_lat,
@@ -203,5 +227,6 @@ async def compare_runs(
             "delta_pct": relative_change(cand_lat, base_lat),
         },
         "verdict": verdict,
+        "warnings": warnings,
         "cases": cases,
     }

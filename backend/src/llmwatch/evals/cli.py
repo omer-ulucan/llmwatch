@@ -293,6 +293,8 @@ def _print_comparison(c: dict[str, Any], out) -> None:
     if cost["delta_pct"] is not None:
         print(f"    cost per case {cost['delta_pct']:+.1f}%", file=out)
     print(f"    verdict: {verdict}", file=out)
+    for warning in c.get("warnings", []):
+        print(f"    note: {warning}", file=out)
 
 
 async def _open_backend(args) -> Backend:

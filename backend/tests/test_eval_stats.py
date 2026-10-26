@@ -382,3 +382,41 @@ async def test_compare_is_workspace_scoped(client, suite_and_runs, make_account)
         headers=other.headers,
     )
     assert resp.status_code == 404
+
+
+async def test_tiny_samples_are_not_called_significant(client, suite_and_runs):
+    """Regression: with 3 paired cases that all improved, the bootstrap interval
+    collapsed to [+1, +1] and the comparison said "improved" although McNemar
+    (p = 0.25) did not support it."""
+    acct, _, make_run = suite_and_runs
+    base = await make_run("fake-model", {i: (0.0, False) for i in range(3)})
+    cand = await make_run("fake-model", {i: (1.0, True) for i in range(3)})
+
+    body = await _compare(client, acct, base, cand)
+
+    assert body["paired_cases"] == 3
+    assert body["score"]["delta"] == pytest.approx(1.0)
+    assert body["score"]["significant"] is False
+    assert body["pass_rate"]["p_value"] == pytest.approx(0.25)
+    assert body["verdict"] == "no_significant_difference"
+    assert any("3 paired cases" in w for w in body["warnings"])
+
+
+async def test_small_but_decisive_samples_can_still_be_significant(
+    client, suite_and_runs
+):
+    """McNemar's exact test is valid for small n: 8 of 8 fixes is p = 2/256."""
+    acct, _, make_run = suite_and_runs
+    base = await make_run("fake-model", {i: (0.0, False) for i in range(8)})
+    cand = await make_run("fake-model", {i: (1.0, True) for i in range(8)})
+    body = await _compare(client, acct, base, cand)
+    assert body["score"]["significant"] is False  # bootstrap needs >= 10 cases
+    assert body["pass_rate"]["significant"] is True
+    assert body["verdict"] == "improved"
+
+
+async def test_enough_cases_have_no_warning(client, suite_and_runs):
+    acct, _, make_run = suite_and_runs
+    base = await make_run("fake-model", {i: (1.0, True) for i in range(40)})
+    cand = await make_run("fake-model", {i: (1.0, True) for i in range(40)})
+    assert (await _compare(client, acct, base, cand))["warnings"] == []
