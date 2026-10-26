@@ -1,6 +1,7 @@
 import {
   Activity,
   Bot,
+  Boxes,
   ListTree,
   MessageSquare,
   PieChart,
@@ -20,6 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { name: 'Agent', path: '/agent', icon: Bot },
   { name: 'Traces', path: '/traces', icon: ListTree },
   { name: 'Analytics', path: '/analytics', icon: PieChart },
+  { name: 'Models', path: '/models', icon: Boxes },
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
 

@@ -21,6 +21,7 @@ const Agent = lazy(() => import('@/routes/agent'));
 const Traces = lazy(() => import('@/routes/traces'));
 const Analytics = lazy(() => import('@/routes/analytics'));
 const Settings = lazy(() => import('@/routes/settings'));
+const Models = lazy(() => import('@/routes/models'));
 
 const RouteError: React.FC = () => {
   const error = useRouteError();
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
       { path: 'agent', element: <Agent /> },
       { path: 'traces', element: <Traces /> },
       { path: 'analytics', element: <Analytics /> },
+      { path: 'models', element: <Models /> },
       { path: 'settings', element: <Settings /> },
     ],
   },
