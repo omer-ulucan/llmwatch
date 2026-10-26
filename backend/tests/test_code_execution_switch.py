@@ -29,19 +29,19 @@ def test_code_execution_is_disabled_by_default(monkeypatch):
 
 def test_code_tool_not_built_when_disabled(code_execution):
     code_execution(False)
-    from llmwatch.services.agent_service import build_tools
+    from llmwatch.agent.tools import build_toolset
 
-    tools = build_tools("company-123", ["web_search", "code_execute"])
-
-    assert [t.name for t in tools] == ["web_search"]
+    assert list(build_toolset(["web_search", "code_execute", "python"])) == [
+        "web_search"
+    ]
 
 
 def test_code_tool_refuses_to_run_when_disabled(code_execution, tmp_path):
     code_execution(False)
-    from llmwatch.tools.code_executor import execute_python
+    from llmwatch.agent.python_exec import run_python
 
     marker = tmp_path / "ran"
-    result = execute_python.invoke(f"open({str(marker)!r}, 'w').write('x')")
+    result = run_python(f"open({str(marker)!r}, 'w').write('x')")
 
     assert "disabled" in result.lower()
     assert not marker.exists()
@@ -75,12 +75,12 @@ def test_agent_request_accepts_code_execute_when_enabled(code_execution):
 
 
 def test_available_tools_reflects_switch(code_execution):
-    from llmwatch.services.agent_service import available_tools
+    from llmwatch.agent.tools import available_tool_names
 
     code_execution(False)
-    assert "code_execute" not in available_tools()
+    assert "python" not in available_tool_names()
     code_execution(True)
-    assert "code_execute" in available_tools()
+    assert "python" in available_tool_names()
 
 
 class TestHardeningWhenEnabled:
@@ -91,34 +91,34 @@ class TestHardeningWhenEnabled:
         code_execution(True)
 
     def test_child_runs_in_isolated_mode(self):
-        from llmwatch.tools.code_executor import execute_python
+        from llmwatch.agent.python_exec import run_python
 
-        result = execute_python.invoke("import sys; print(sys.flags.isolated)")
+        result = run_python("import sys; print(sys.flags.isolated)")
         assert result.strip() == "1"
 
     def test_child_environment_has_no_backend_secrets(self, monkeypatch):
         monkeypatch.setenv("SUPER_SECRET_TOKEN", "s3cr3t")
-        from llmwatch.tools.code_executor import execute_python
+        from llmwatch.agent.python_exec import run_python
 
-        result = execute_python.invoke("import os; print(sorted(os.environ))")
+        result = run_python("import os; print(sorted(os.environ))")
         assert "SUPER_SECRET_TOKEN" not in result
         assert "JWT_SECRET_KEY" not in result
 
     def test_child_runs_in_a_throwaway_working_directory(self):
         import os
 
-        from llmwatch.tools.code_executor import execute_python
+        from llmwatch.agent.python_exec import run_python
 
-        result = execute_python.invoke("import os; print(os.getcwd())")
+        result = run_python("import os; print(os.getcwd())")
         assert result.strip() != os.getcwd()
         assert not os.path.exists(result.strip())  # cleaned up afterwards
 
     def test_child_has_resource_limits(self):
         import resource
 
-        from llmwatch.tools.code_executor import MAX_MEMORY_BYTES, execute_python
+        from llmwatch.agent.python_exec import MAX_MEMORY_BYTES, run_python
 
-        result = execute_python.invoke(
+        result = run_python(
             "import resource; print(resource.getrlimit(resource.RLIMIT_AS)[1])"
         )
         hard_as = int(result.strip())
@@ -127,10 +127,10 @@ class TestHardeningWhenEnabled:
             assert hard_as == MAX_MEMORY_BYTES
 
     def test_timeout_kills_the_child(self, monkeypatch):
-        import llmwatch.tools.code_executor as ce
+        import llmwatch.agent.python_exec as ce
 
         monkeypatch.setattr(ce, "EXECUTION_TIMEOUT", 1)
-        result = ce.execute_python.invoke("while True: pass")
+        result = ce.run_python("while True: pass")
         assert "timed out" in result.lower()
 
 
