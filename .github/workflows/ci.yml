@@ -56,3 +56,5 @@ jobs:
         run: npx tsc -b
       - name: Build
         run: npx vite build
+      - name: Unit tests
+        run: npm test
