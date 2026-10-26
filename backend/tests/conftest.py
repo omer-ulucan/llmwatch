@@ -7,6 +7,7 @@ before any application module is loaded.
 """
 
 import os
+import socket
 
 import pytest
 
@@ -35,6 +36,35 @@ for key, value in _TEST_ENV.items():
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    """Fails any test that opens a connection beyond loopback.
+
+    WHY: Tests must use fakes (FakeProvider, MockTransport, stub resolvers); a real
+    network call makes them slow and flaky, and once hid a missing fixture behind
+    minutes of retries. Loopback stays allowed for TEST_DATABASE_URL (Postgres).
+    """
+    real_connect = socket.socket.connect
+    real_connect_ex = socket.socket.connect_ex
+
+    def check(address):
+        if isinstance(address, tuple) and address[0] not in _LOOPBACK:
+            raise RuntimeError(f"Tests must not use the network (tried {address!r})")
+
+    def connect(self, address):
+        check(address)
+        return real_connect(self, address)
+
+    def connect_ex(self, address):
+        check(address)
+        return real_connect_ex(self, address)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
 
 
 @pytest.fixture
