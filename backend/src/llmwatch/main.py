@@ -15,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 from llmwatch.config import logger, settings
 from llmwatch.db import migrate
 from llmwatch.db.engine import dispose_engine, get_sessionmaker, is_memory_sqlite
+from llmwatch.evals.runner import mark_interrupted_runs
 from llmwatch.exceptions import LLMServiceException, LLMWatchException
 from llmwatch.middleware.security import setup_security_middleware
 from llmwatch.providers.service import sync_env_providers_all
@@ -57,6 +58,9 @@ async def lifespan(app: FastAPI):
     if settings.auto_migrate and not is_memory_sqlite(settings.database_url):
         async with get_sessionmaker()() as session:
             await sync_env_providers_all(session)
+        interrupted = await mark_interrupted_runs()
+        if interrupted:
+            logger.warning(f"{interrupted} eval run(s) were interrupted; resume them")
     logger.info(
         f"LLMWatch {settings.app_version} startup complete in environment: {settings.app_env}"
     )
