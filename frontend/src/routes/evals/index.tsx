@@ -24,7 +24,7 @@ const columns: Column<Row>[] = [
     sortValue: (s) => s.name,
     render: (s) => (
       <div>
-        <div className="font-medium">{s.name}</div>
+        <div className="whitespace-nowrap font-medium">{s.name}</div>
         {s.description && <div className="line-clamp-1 max-w-md text-xs text-muted-foreground">{s.description}</div>}
       </div>
     ),
