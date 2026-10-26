@@ -456,6 +456,7 @@ export interface CaseComparison {
 
 export interface RunInfo {
   id: string;
+  suite_id: string;
   label: string;
   status: RunStatus;
   model: string;

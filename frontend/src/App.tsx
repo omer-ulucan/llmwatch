@@ -23,6 +23,10 @@ const TraceDetail = lazy(() => import('@/routes/trace-detail'));
 const Analytics = lazy(() => import('@/routes/analytics'));
 const Settings = lazy(() => import('@/routes/settings'));
 const Models = lazy(() => import('@/routes/models'));
+const Evals = lazy(() => import('@/routes/evals'));
+const EvalSuite = lazy(() => import('@/routes/evals/suite'));
+const EvalRun = lazy(() => import('@/routes/evals/run'));
+const EvalCompare = lazy(() => import('@/routes/evals/compare'));
 
 const RouteError: React.FC = () => {
   const error = useRouteError();
@@ -54,6 +58,10 @@ const router = createBrowserRouter([
       { path: 'agent', element: <Agent /> },
       { path: 'traces', element: <Traces /> },
       { path: 'traces/:runId', element: <TraceDetail /> },
+      { path: 'evals', element: <Evals /> },
+      { path: 'evals/suites/:id', element: <EvalSuite /> },
+      { path: 'evals/runs/:id', element: <EvalRun /> },
+      { path: 'evals/compare', element: <EvalCompare /> },
       { path: 'analytics', element: <Analytics /> },
       { path: 'models', element: <Models /> },
       { path: 'settings', element: <Settings /> },
