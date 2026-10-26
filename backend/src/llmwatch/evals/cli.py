@@ -118,7 +118,11 @@ class LocalBackend:
                 self.workspace_id,
                 suite_id=body["suite_id"],
                 variants=[
-                    runner.VariantSpec(model=v["model"], params=v.get("params", {}))
+                    runner.VariantSpec(
+                        model=v["model"],
+                        params=v.get("params", {}),
+                        thinking=v.get("thinking", False),
+                    )
                     for v in body["variants"]
                 ],
                 repeats=body["repeats"],
@@ -198,7 +202,12 @@ class ServerBackend:
     async def start_runs(self, body: dict[str, Any]) -> list[dict[str, Any]]:
         payload = dict(body)
         payload["variants"] = [
-            {"model": v["model"], **v.get("params", {})} for v in body["variants"]
+            {
+                "model": v["model"],
+                "thinking": v.get("thinking", False),
+                **v.get("params", {}),
+            }
+            for v in body["variants"]
         ]
         return (await self._call("POST", "/evals/runs", json=payload))["runs"]
 
@@ -319,7 +328,10 @@ async def eval_run(args, out=sys.stdout, err=sys.stderr) -> int:
         runs = await backend.start_runs(
             {
                 "suite_id": suite["id"],
-                "variants": [{"model": m, "params": params} for m in args.model],
+                "variants": [
+                    {"model": m, "params": params, "thinking": args.thinking}
+                    for m in args.model
+                ],
                 "repeats": args.repeats,
                 "concurrency": args.concurrency,
                 "judge_model": args.judge_model,
@@ -443,6 +455,11 @@ def add_eval_commands(sub) -> None:
         "--embedding-model", help="Default model for similarity assertions"
     )
     run.add_argument("--no-cache", action="store_true", help="Always call the model")
+    run.add_argument(
+        "--thinking",
+        action="store_true",
+        help="Let reasoning models think (off by default)",
+    )
     run.add_argument(
         "--baseline",
         help="Run id to compare against, or 'suite' for the suite's baseline",

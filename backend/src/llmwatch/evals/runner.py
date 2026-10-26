@@ -44,6 +44,7 @@ from llmwatch.evals.suites import LoadedSuite, load_suite, load_version_by_id
 from llmwatch.evals.template import TemplateError
 from llmwatch.exceptions import ValidationException
 from llmwatch.llm import ChatResult, LLMClient, LLMError, Usage, compute_cost
+from llmwatch.llm.reasoning import reasoning_controls
 from llmwatch.providers import service as provider_service
 from llmwatch.providers.models import resolve_model
 
@@ -56,6 +57,8 @@ class VariantSpec:
     model: str
     params: dict[str, Any] = field(default_factory=dict)
     label: str = ""
+    # Let reasoning models think (off by default, as in chat).
+    thinking: bool = False
 
 
 async def create_runs(
@@ -100,6 +103,7 @@ async def create_runs(
                 "provider": p.name,
                 "provider_id": p.id,
                 "params": {k: v for k, v in spec.params.items() if v is not None},
+                "thinking": spec.thinking,
                 "judge_model": judge_model,
                 "embedding_model": embedding_model,
                 "use_cache": use_cache,
@@ -254,12 +258,15 @@ class RunExecutor:
             resolved, client = await resolve(ref)
             if not resolved.model.supports_json:
                 params = {k: v for k, v in params.items() if k != "response_format"}
+            prefix, knobs = reasoning_controls(
+                resolved.provider.preset, resolved.model.supports_reasoning, False
+            )
             response, _ = await self._cached_chat(
                 client,
                 resolved.provider.id,
                 resolved.model.model_id,
-                messages,
-                params,
+                prefix + messages,
+                {**params, **knobs},
                 0,
                 use_cache,
             )
@@ -346,6 +353,7 @@ class RunExecutor:
                     prices,
                     ctx,
                     variant.get("use_cache", True),
+                    bool(variant.get("thinking", False)),
                 )
 
         try:
@@ -368,6 +376,7 @@ class RunExecutor:
         prices: dict[str, Any],
         ctx: EvalContext,
         use_cache: bool,
+        thinking: bool = False,
     ) -> None:
         result = EvalResult(
             workspace_id=self.workspace_id,
@@ -377,12 +386,18 @@ class RunExecutor:
         )
         try:
             messages = build_messages(loaded.definition, case.vars)
+            # WHY: Same reasoning knobs as chat (e.g. Ollama models otherwise spend
+            # max_tokens on hidden reasoning). Part of the request, so part of the
+            # cache key too.
+            prefix, knobs = reasoning_controls(
+                provider.preset, model.supports_reasoning, thinking
+            )
             response, was_cached = await self._cached_chat(
                 client,
                 provider.id,
                 model.model_id,
-                messages,
-                params,
+                prefix + messages,
+                {**params, **knobs},
                 repeat,
                 use_cache,
             )

@@ -247,6 +247,8 @@ class VariantBody(BaseModel):
     max_tokens: int | None = Field(None, gt=0, le=200_000)
     top_p: float | None = Field(None, gt=0, le=1)
     seed: int | None = None
+    # Let reasoning models think (off by default, as in chat).
+    thinking: bool = False
 
 
 class RunBody(BaseModel):
@@ -320,6 +322,7 @@ async def create_runs(
             runner.VariantSpec(
                 model=v.model,
                 label=v.label,
+                thinking=v.thinking,
                 params={
                     "temperature": v.temperature,
                     "max_tokens": v.max_tokens,
