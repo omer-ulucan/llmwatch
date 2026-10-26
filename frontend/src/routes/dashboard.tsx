@@ -1,203 +1,222 @@
 /**
  * Component: Dashboard
- * Purpose: Main analytical hub.
- * WHY: Recharts powers the visual metrics. The data is staggered via Framer motion for a dynamic feel.
+ * Purpose: Usage at a glance for the selected time window.
+ * WHY: Every number comes from the database over the chosen window, and the trend
+ * badges compare with the previous window of the same length (no invented trends).
  */
-import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Activity, DollarSign, Clock, AlertTriangle, Bot, CheckCircle, Hash } from 'lucide-react';
-import MetricCard from '@/components/Dashboard/MetricCard';
-import { apiClient } from '@/api/client';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router';
+import { Activity, AlertTriangle, Bot, Clock, DollarSign, MessageSquare } from 'lucide-react';
 import { agentApi } from '@/api/agent';
-import { MetricSummary } from '@/types';
-import type { AgentAnalytics } from '@/types';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  BarChart, Bar, Legend
-} from 'recharts';
+import { analyticsApi } from '@/api/analytics';
+import { SeriesChart } from '@/components/analytics/charts';
+import { TimeRangePicker } from '@/components/analytics/TimeRange';
+import { useTimeRange } from '@/hooks/useTimeRange';
+import { Button, Card, DataTable, EmptyState, ErrorState, PageHeader, Skeleton, StatCard, type Column } from '@/components/ui';
+import { formatCompact, formatCost, formatMs, formatNumber, formatPct } from '@/lib/format';
+import type { ModelBreakdownEntry } from '@/types';
 
-interface TimeseriesData {
-  timestamps: string[];
-  costs: number[];
-  latencies: number[];
-  request_counts: number[];
-}
+type ModelRow = ModelBreakdownEntry & { key: string };
+
+const modelColumns: Column<ModelRow>[] = [
+  {
+    key: 'model',
+    header: 'Model',
+    sortValue: (m) => m.key,
+    render: (m) => (
+      <div>
+        <div className="font-medium">{m.model}</div>
+        {m.provider && <div className="text-xs text-muted-foreground">{m.provider}</div>}
+      </div>
+    ),
+  },
+  { key: 'requests', header: 'Requests', align: 'right', sortValue: (m) => m.requests, render: (m) => formatNumber(m.requests) },
+  { key: 'errors', header: 'Error rate', align: 'right', sortValue: (m) => m.error_rate_pct, render: (m) => formatPct(m.error_rate_pct) },
+  { key: 'latency', header: 'Avg latency', align: 'right', sortValue: (m) => m.avg_latency_ms, render: (m) => formatMs(m.avg_latency_ms) },
+  {
+    key: 'tokens',
+    header: 'Tokens',
+    align: 'right',
+    sortValue: (m) => m.input_tokens + m.output_tokens,
+    render: (m) => formatCompact(m.input_tokens + m.output_tokens),
+  },
+  { key: 'cost', header: 'Cost', align: 'right', sortValue: (m) => m.cost, render: (m) => formatCost(m.cost) },
+];
 
 const Dashboard: React.FC = () => {
-  const [summary, setSummary] = useState<MetricSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [timeseriesData, setTimeseriesData] = useState<{time: string; cost: number; latency: number}[]>([]);
-  const [agentStats, setAgentStats] = useState<AgentAnalytics | null>(null);
+  const { range, setRange } = useTimeRange('24h');
+  const filters = { hours: range.hours };
+  const summary = useQuery({ queryKey: ['summary', filters], queryFn: () => analyticsApi.summary(filters) });
+  const series = useQuery({ queryKey: ['timeseries', filters], queryFn: () => analyticsApi.timeseries(filters) });
+  const agent = useQuery({
+    queryKey: ['agent-analytics', range.hours],
+    queryFn: () => agentApi.getAgentAnalytics(range.hours).then((r) => r.data),
+  });
 
-  useEffect(() => {
-    // WHY: Initial data fetch to hydrate dashboard KPIs and timeseries chart
-    Promise.all([
-      apiClient.get('/analytics/summary'),
-      apiClient.get('/analytics/timeseries'),
-      agentApi.getAgentAnalytics().catch(() => null),
-    ])
-      .then(([summaryRes, timeseriesRes, agentRes]) => {
-        setSummary(summaryRes.data);
-        const ts: TimeseriesData = timeseriesRes.data;
-        const chartData = ts.timestamps.map((t: string, i: number) => ({
-          time: t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : `${i}`,
-          cost: ts.costs[i] ?? 0,
-          latency: ts.latencies[i] ?? 0,
-        }));
-        setTimeseriesData(chartData);
-        if (agentRes) setAgentStats(agentRes.data);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 rounded-full border-t-2 border-primary animate-spin" />
-      </div>
-    );
-  }
-
-  // One bar group per model actually used in the window (top 6 by requests).
-  const comparisonData = summary
-    ? Object.entries(summary.model_breakdown)
-        .slice(0, 6)
-        .map(([name, m]) => ({
-          name: m.model || name,
-          Requests: m.requests,
-          'Cost ($)': Number(m.cost.toFixed(4)),
-        }))
-    : [];
+  const s = summary.data;
+  const models: ModelRow[] = Object.entries(s?.model_breakdown ?? {}).map(([key, m]) => ({ key, ...m }));
+  const empty = s && s.total_requests === 0;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12">
-      {/* Top Level KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard 
-          title="Total Requests (24h)" 
-          value={(summary?.total_requests || 0).toLocaleString()} 
-          trend={12.5} 
-          icon={<Activity size={24} />} 
-          delay={0.1}
-        />
-        <MetricCard 
-          title="Total Cost" 
-          value={`$${(summary?.total_cost_usd || 0).toFixed(4)}`} 
-          trend={-2.4} 
-          inverseTrend
-          icon={<DollarSign size={24} />} 
-          delay={0.2}
-        />
-        <MetricCard 
-          title="Avg Latency" 
-          value={`${Math.round(summary?.avg_latency_ms || 0)}ms`} 
-          trend={-15} 
-          inverseTrend
-          icon={<Clock size={24} />} 
-          delay={0.3}
-        />
-        <MetricCard 
-          title="Error Rate" 
-          value={`${(summary?.error_rate_pct || 0).toFixed(1)}%`} 
-          trend={0} 
-          inverseTrend
-          icon={<AlertTriangle size={24} />} 
-          delay={0.4}
-        />
-      </div>
+    <div className="mx-auto max-w-7xl space-y-6 pb-12">
+      <PageHeader
+        title="Dashboard"
+        description={`LLM usage over the last ${range.label}, compared with the ${range.label} before.`}
+        actions={<TimeRangePicker value={range.id} onChange={setRange} />}
+      />
 
-      {/* Main Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="col-span-1 lg:col-span-2 glass-panel p-6 rounded-2xl h-[400px] flex flex-col"
-        >
-          <h3 className="text-lg font-semibold mb-6 tracking-tight">Cost & Activity Over Time</h3>
-          <div className="flex-1 min-h-0 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={timeseriesData}>
-                <defs>
-                  <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="time" stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <RechartsTooltip 
-                  contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-card-border)', borderRadius: '12px' }}
-                  itemStyle={{ color: 'var(--color-foreground)' }}
-                />
-                <Area type="monotone" dataKey="cost" stroke="var(--color-primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorCost)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="col-span-1 glass-panel p-6 rounded-2xl h-[400px] flex flex-col"
-        >
-          <h3 className="text-lg font-semibold mb-6 tracking-tight">Model Distribution</h3>
-          <div className="flex-1 min-h-0 w-full">
-             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={comparisonData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="name" stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <RechartsTooltip 
-                   cursor={{fill: 'rgba(255,255,255,0.02)'}}
-                   contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-card-border)', borderRadius: '12px' }}
-                />
-                <Legend iconType="circle" />
-                <Bar dataKey="Requests" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Cost ($)" fill="var(--color-secondary)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Agent KPIs */}
-      {agentStats && agentStats.total_runs > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4 tracking-tight flex items-center gap-2">
-            <Bot size={20} className="text-primary" />
-            Agent Activity
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MetricCard
-              title="Agent Runs"
-              value={agentStats.total_runs.toLocaleString()}
-              icon={<Bot size={24} />}
-              delay={0.7}
-            />
-            <MetricCard
-              title="Success Rate"
-              value={`${agentStats.success_rate.toFixed(1)}%`}
-              icon={<CheckCircle size={24} />}
-              delay={0.8}
-            />
-            <MetricCard
-              title="Avg Steps"
-              value={agentStats.avg_steps.toFixed(1)}
-              icon={<Hash size={24} />}
-              delay={0.9}
-            />
-            <MetricCard
-              title="Agent Cost"
-              value={`$${agentStats.total_cost_usd.toFixed(4)}`}
-              inverseTrend
-              icon={<DollarSign size={24} />}
-              delay={1.0}
-            />
-          </div>
+      {summary.error ? (
+        <ErrorState error={summary.error} onRetry={() => void summary.refetch()} />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Requests"
+            icon={<Activity size={20} />}
+            loading={summary.isLoading}
+            value={formatNumber(s?.total_requests)}
+            deltaPct={s?.deltas_pct.total_requests}
+          />
+          <StatCard
+            title="Cost"
+            icon={<DollarSign size={20} />}
+            loading={summary.isLoading}
+            value={formatCost(s?.total_cost_usd)}
+            deltaPct={s?.deltas_pct.total_cost_usd}
+            inverse
+            hint={s ? `${formatCompact(s.input_tokens + s.output_tokens)} tokens` : undefined}
+          />
+          <StatCard
+            title="p95 latency"
+            icon={<Clock size={20} />}
+            loading={summary.isLoading}
+            value={formatMs(s?.p95_latency_ms)}
+            deltaPct={s?.deltas_pct.p95_latency_ms}
+            inverse
+            hint={s ? `p50 ${formatMs(s.p50_latency_ms)}` : undefined}
+          />
+          <StatCard
+            title="Error rate"
+            icon={<AlertTriangle size={20} />}
+            loading={summary.isLoading}
+            value={formatPct(s?.error_rate_pct)}
+            deltaPct={s?.deltas_pct.error_rate_pct}
+            inverse
+            hint={s ? `${formatNumber(s.total_errors)} failed${s.total_cancelled ? `, ${s.total_cancelled} cancelled` : ''}` : undefined}
+          />
         </div>
+      )}
+
+      {empty ? (
+        <Card>
+          <EmptyState
+            icon={<MessageSquare size={28} />}
+            title={`No LLM calls in the last ${range.label}`}
+            description="Chat, agent runs and evals are all logged here with their latency, tokens and cost."
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link to="/chat">
+                  <Button>Open chat</Button>
+                </Link>
+                <Link to="/models">
+                  <Button variant="secondary">Configure models</Button>
+                </Link>
+              </div>
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <h3 className="mb-4 font-semibold">Requests and errors</h3>
+              {series.isLoading || !series.data ? (
+                <Skeleton className="h-60 w-full" />
+              ) : (
+                <SeriesChart
+                  buckets={series.data.buckets}
+                  bucketSeconds={series.data.bucket_seconds}
+                  series={[
+                    { key: 'requests', label: 'Requests', color: 'var(--color-primary)' },
+                    { key: 'errors', label: 'Errors', color: 'var(--color-error)' },
+                  ]}
+                  valueFormatter={(v) => formatCompact(v)}
+                />
+              )}
+            </Card>
+            <Card className="p-5">
+              <h3 className="mb-4 font-semibold">Cost</h3>
+              {series.isLoading || !series.data ? (
+                <Skeleton className="h-60 w-full" />
+              ) : (
+                <SeriesChart
+                  buckets={series.data.buckets}
+                  bucketSeconds={series.data.bucket_seconds}
+                  series={[{ key: 'cost_usd', label: 'Cost', color: 'var(--color-secondary)' }]}
+                  valueFormatter={(v) => formatCost(v)}
+                />
+              )}
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Card className="overflow-hidden xl:col-span-2">
+              <h3 className="px-5 pt-5 font-semibold">By model</h3>
+              <DataTable
+                columns={modelColumns}
+                rows={models}
+                rowKey={(m) => m.key}
+                loading={summary.isLoading}
+                initialSort={{ key: 'requests', dir: 'desc' }}
+                pageSize={8}
+              />
+            </Card>
+            <Card className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Bot size={18} className="text-primary" />
+                <h3 className="font-semibold">Agent runs</h3>
+              </div>
+              {agent.isLoading ? (
+                <Skeleton className="h-32 w-full" />
+              ) : agent.data && agent.data.total_runs > 0 ? (
+                <dl className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Runs</dt>
+                    <dd className="text-xl font-semibold">{formatNumber(agent.data.total_runs)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Success rate</dt>
+                    <dd className="text-xl font-semibold">{formatPct(agent.data.success_rate)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Avg steps</dt>
+                    <dd className="text-xl font-semibold">{agent.data.avg_steps}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Cost</dt>
+                    <dd className="text-xl font-semibold">{formatCost(agent.data.total_cost_usd)}</dd>
+                  </div>
+                  {Object.keys(agent.data.tool_usage).length > 0 && (
+                    <div className="col-span-2">
+                      <dt className="mb-1 text-muted-foreground">Tools used</dt>
+                      <dd className="flex flex-wrap gap-2">
+                        {Object.entries(agent.data.tool_usage).map(([tool, n]) => (
+                          <span key={tool} className="rounded-md bg-white/[0.05] px-2 py-0.5 font-mono text-xs">
+                            {tool} × {n}
+                          </span>
+                        ))}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No agent runs in this window. <Link to="/agent" className="text-primary hover:underline">Run the agent</Link>
+                </p>
+              )}
+            </Card>
+          </div>
+        </>
       )}
     </div>
   );
