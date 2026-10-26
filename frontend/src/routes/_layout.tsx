@@ -1,41 +1,42 @@
 /**
- * Component: Layout (formerly _layout.tsx)
- * Purpose: App shell that houses the Sidebar and Navbar around the router Outlet.
+ * Component: Layout
+ * Purpose: App shell: sidebar (rail on desktop, drawer on mobile), navbar, page.
  * WHY: Prevents unmounting and remounting of navigation elements during page transitions.
  */
-import React from 'react';
-import { Outlet, Navigate, useLocation } from 'react-router';
-import Sidebar from '@/components/Layout/Sidebar';
+import React, { Suspense, useState } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router';
+import { Sheet, SkeletonRows } from '@/components/ui';
 import Navbar from '@/components/Layout/Navbar';
+import { MobileNav, Sidebar } from '@/components/Layout/Sidebar';
 import { useStore } from '@/store/useStore';
-import { motion, AnimatePresence } from 'framer-motion';
+
+export const PageFallback: React.FC = () => (
+  <div className="mx-auto max-w-5xl pt-4">
+    <SkeletonRows rows={6} />
+  </div>
+);
 
 const Layout: React.FC = () => {
-  const isAuthenticated = useStore(state => state.isAuthenticated);
+  const isAuthenticated = useStore((state) => state.isAuthenticated);
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-mesh relative">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-8 relative z-0">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="h-full"
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Navigation" side="left">
+        <MobileNav onNavigate={() => setMenuOpen(false)} />
+      </Sheet>
+      <div className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-mesh">
+        <Navbar onOpenMenu={() => setMenuOpen(true)} />
+        <main className="relative z-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

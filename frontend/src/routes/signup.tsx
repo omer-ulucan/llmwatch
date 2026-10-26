@@ -8,11 +8,11 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { UserPlus, Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
-import { apiClient } from '@/api/client';
+import { authApi } from '@/api/auth';
 import { getErrorMessage } from '@/api/errors';
 
 const Signup: React.FC = () => {
-  const [companyName, setCompanyName] = useState('');
+  const [workspaceName, setWorkspaceName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -23,7 +23,7 @@ const Signup: React.FC = () => {
   const navigate = useNavigate();
 
   const validate = (): string | null => {
-    if (!companyName.trim()) return 'Company name is required';
+    if (!workspaceName.trim()) return 'Workspace name is required';
     if (!email.trim()) return 'Email is required';
     if (password.length < 8) return 'Password must be at least 8 characters';
     if (password !== confirmPassword) return 'Passwords do not match';
@@ -43,11 +43,7 @@ const Signup: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await apiClient.post('/auth/register', {
-        email,
-        password,
-        company_name: companyName,
-      });
+      await authApi.register(email, password, workspaceName.trim());
       setSuccess(true);
       // Redirect to login after a short delay so the user sees the success message
       setTimeout(() => navigate('/login'), 2000);
@@ -117,13 +113,13 @@ const Signup: React.FC = () => {
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground ml-1">
-                Company Name
+                Workspace name
               </label>
               <input
                 type="text"
                 required
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
                 className="w-full bg-input/50 border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300"
                 placeholder="Acme Corp"
               />

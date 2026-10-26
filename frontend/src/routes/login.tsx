@@ -4,10 +4,11 @@
  * WHY: High visual impact first impression with animated mesh. Uses Zustand to securely store JWT.
  */
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router';
+import { useLocation, useNavigate, Link } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { LogIn, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
-import { apiClient } from '@/api/client';
+import { authApi } from '@/api/auth';
 import { getErrorMessage } from '@/api/errors';
 import { useStore } from '@/store/useStore';
 
@@ -18,6 +19,8 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
   const setAuth = useStore(state => state.setAuth);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -26,9 +29,12 @@ const Login: React.FC = () => {
     setError(null);
     
     try {
-      const response = await apiClient.post('/auth/login', { email, password });
-      setAuth(response.data.access_token);
-      navigate('/dashboard');
+      const { access_token } = await authApi.login(email, password);
+      queryClient.clear();
+      setAuth(access_token);
+      // Back to the page that required sign-in, if any.
+      const from = (location.state as { from?: string } | null)?.from;
+      navigate(from && from !== '/login' ? from : '/dashboard', { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Authentication failed'));
     } finally {

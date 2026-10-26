@@ -1,99 +1,85 @@
 /**
  * Component: Sidebar
- * Purpose: Global navigation sidebar.
- * WHY: Framer Motion provides a premium feeling width transition. Active states hint current location clearly.
+ * Purpose: Global navigation: a collapsible rail on desktop, a drawer on mobile.
  */
 import React from 'react';
 import { NavLink } from 'react-router';
-import { motion } from 'framer-motion';
-import { Activity, MessageSquare, PieChart, Settings, Menu, Zap, Bot, ListTree } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Zap } from 'lucide-react';
+import { cn } from '@/lib/cn';
 import { useStore } from '@/store/useStore';
+import { NAV_ITEMS } from './nav';
 
-const Sidebar: React.FC = () => {
+const NavLinks: React.FC<{ expanded: boolean; onNavigate?: () => void }> = ({ expanded, onNavigate }) => (
+  <nav className="flex-1 space-y-1 px-3" aria-label="Main">
+    {NAV_ITEMS.map(({ name, path, icon: Icon }) => (
+      <NavLink
+        key={path}
+        to={path}
+        onClick={onNavigate}
+        title={expanded ? undefined : name}
+        className={({ isActive }) =>
+          cn(
+            'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+            isActive
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-white/[0.03] hover:text-foreground',
+            !expanded && 'justify-center px-0',
+          )
+        }
+      >
+        {({ isActive }) => (
+          <>
+            {isActive && <span className="absolute inset-y-1 left-0 w-1 rounded-r-md bg-primary" aria-hidden />}
+            <Icon size={19} aria-hidden />
+            {expanded ? <span>{name}</span> : <span className="sr-only">{name}</span>}
+          </>
+        )}
+      </NavLink>
+    ))}
+  </nav>
+);
+
+const Brand: React.FC<{ expanded: boolean }> = ({ expanded }) => (
+  <div className={cn('mb-6 flex items-center gap-3 px-5', !expanded && 'justify-center px-0')}>
+    <div className="rounded-xl bg-primary/20 p-2 text-primary glow-effect">
+      <Zap size={22} aria-hidden />
+    </div>
+    {expanded && <span className="text-lg font-bold tracking-tight">LLMWatch</span>}
+  </div>
+);
+
+/** Desktop rail (hidden below md). */
+export const Sidebar: React.FC = () => {
   const { isSidebarOpen, toggleSidebar } = useStore();
-
-  const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <Activity size={20} /> },
-    { name: 'Chat', path: '/chat', icon: <MessageSquare size={20} /> },
-    { name: 'Agent', path: '/agent', icon: <Bot size={20} /> },
-    { name: 'Traces', path: '/traces', icon: <ListTree size={20} /> },
-    { name: 'Analytics', path: '/analytics', icon: <PieChart size={20} /> },
-    { name: 'Settings', path: '/settings', icon: <Settings size={20} /> },
-  ];
-
   return (
-    <motion.aside
-      initial={false}
-      animate={{ width: isSidebarOpen ? 240 : 80 }}
-      className="h-screen bg-card border-r border-border shadow-2xl flex flex-col pt-6 pb-6 relative z-20 flex-shrink-0"
+    <aside
+      className={cn(
+        'hidden md:flex h-screen shrink-0 flex-col border-r border-border bg-card pt-5 pb-4 transition-[width] duration-200',
+        isSidebarOpen ? 'w-60' : 'w-[4.5rem]',
+      )}
     >
-      <div className="flex items-center justify-between px-6 mb-8">
-        <motion.div 
-          className="flex items-center gap-3 overflow-hidden"
-          animate={{ opacity: 1 }}
-        >
-          <div className="p-2 bg-primary/20 text-primary rounded-xl glow-effect">
-            <Zap size={24} />
-          </div>
-          {isSidebarOpen && (
-            <motion.span 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              className="text-xl font-bold tracking-tight text-foreground"
-            >
-              LLMWatch
-            </motion.span>
-          )}
-        </motion.div>
-      </div>
-      
-      <nav className="flex-1 px-4 space-y-2">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => `
-              flex items-center gap-4 px-3 py-3 rounded-lg transition-all duration-300 group relative overflow-hidden
-              ${isActive ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.03]'}
-            `}
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <motion.div 
-                    layoutId="activeTab" 
-                    className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md glow-effect" 
-                  />
-                )}
-                <div className={`${isActive ? 'text-primary' : 'group-hover:text-foreground'}`}>
-                  {item.icon}
-                </div>
-                {isSidebarOpen && (
-                  <motion.span 
-                    initial={{ opacity: 0, x: -10 }} 
-                    animate={{ opacity: 1, x: 0 }}
-                    className="font-medium"
-                  >
-                    {item.name}
-                  </motion.span>
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* Toggle Button */}
-      <div className="px-4 mt-auto">
-        <button 
+      <Brand expanded={isSidebarOpen} />
+      <NavLinks expanded={isSidebarOpen} />
+      <div className="px-3">
+        <button
+          type="button"
           onClick={toggleSidebar}
-          className="w-full flex items-center justify-center py-3 bg-white/[0.03] hover:bg-white/[0.08] border border-card-border rounded-xl transition-colors duration-300 cursor-pointer"
+          className="flex w-full items-center justify-center rounded-xl border border-card-border bg-white/[0.03] py-2.5 text-muted-foreground transition-colors hover:bg-white/[0.08] cursor-pointer"
+          aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
         >
-          <Menu size={20} className="text-muted-foreground" />
+          {isSidebarOpen ? <ChevronsLeft size={18} /> : <ChevronsRight size={18} />}
         </button>
       </div>
-    </motion.aside>
+    </aside>
   );
 };
+
+/** Contents of the mobile drawer. */
+export const MobileNav: React.FC<{ onNavigate: () => void }> = ({ onNavigate }) => (
+  <div className="flex h-full flex-col">
+    <Brand expanded />
+    <NavLinks expanded onNavigate={onNavigate} />
+  </div>
+);
 
 export default Sidebar;
