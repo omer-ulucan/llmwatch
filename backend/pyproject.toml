@@ -39,6 +39,7 @@ dependencies = [
     "alembic>=1.13.0",
     "pyyaml>=6.0",
     "jsonschema>=4.20",
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]
