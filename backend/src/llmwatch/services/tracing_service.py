@@ -9,59 +9,17 @@ frontend via SSE in real-time AND persisted to the database for the trace viewer
 import asyncio
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
-from pydantic import BaseModel
 
+from llmwatch.agent.events import AgentEvent, AgentRunSummary
 from llmwatch.config import logger
 
-
-class AgentEvent(BaseModel):
-    """
-    Represents a single step in an agent execution trace.
-    WHY: This is the universal data contract between the backend (callback handler),
-    the SSE stream, and the frontend trace viewer.
-    """
-
-    run_id: str
-    step_index: int
-    event_type: Literal[
-        "run_start",
-        "thinking",
-        "tool_call",
-        "tool_result",
-        "final_answer",
-        "error",
-        "run_end",
-    ]
-    content: str
-    tool_name: Optional[str] = None
-    tool_input: Optional[str] = None
-    latency_ms: Optional[float] = None
-    tokens: Optional[int] = None
-    cost_usd: Optional[float] = None
-    timestamp: str = ""
-
-    def model_post_init(self, __context: Any) -> None:
-        if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
-
-
-class AgentRunSummary(BaseModel):
-    """Summary metrics emitted as the final 'run_end' event payload."""
-
-    run_id: str
-    total_steps: int
-    total_latency_ms: float
-    total_tokens: int
-    total_cost_usd: float
-    tools_used: List[str]
-    model_used: str
-    success: bool
+# The event models now live in llmwatch.agent.events (shared with the new loop).
 
 
 class TracingCallbackHandler(BaseCallbackHandler):

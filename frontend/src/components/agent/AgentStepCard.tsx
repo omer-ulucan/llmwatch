@@ -22,9 +22,9 @@ const eventConfig: Record<string, { icon: React.ReactNode; color: string; label:
 
 const toolIcons: Record<string, React.ReactNode> = {
   web_search: <Search size={14} />,
-  code_execute: <Code size={14} />,
-  db_query: <Database size={14} />,
-  doc_analyze: <FileText size={14} />,
+  python: <Code size={14} />,
+  query_usage: <Database size={14} />,
+  fetch_url: <FileText size={14} />,
 };
 
 interface AgentStepCardProps {
