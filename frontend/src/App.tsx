@@ -19,6 +19,7 @@ const Dashboard = lazy(() => import('@/routes/dashboard'));
 const Chat = lazy(() => import('@/routes/chat'));
 const Agent = lazy(() => import('@/routes/agent'));
 const Traces = lazy(() => import('@/routes/traces'));
+const TraceDetail = lazy(() => import('@/routes/trace-detail'));
 const Analytics = lazy(() => import('@/routes/analytics'));
 const Settings = lazy(() => import('@/routes/settings'));
 const Models = lazy(() => import('@/routes/models'));
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
       { path: 'chat', element: <Chat /> },
       { path: 'agent', element: <Agent /> },
       { path: 'traces', element: <Traces /> },
+      { path: 'traces/:runId', element: <TraceDetail /> },
       { path: 'analytics', element: <Analytics /> },
       { path: 'models', element: <Models /> },
       { path: 'settings', element: <Settings /> },
