@@ -49,19 +49,29 @@ def jwt_algorithm():
     return _TEST_ENV["JWT_ALGORITHM"]
 
 
+# Run the suite against Postgres by pointing this at an empty database, e.g.
+# postgresql+asyncpg://user:pass@localhost:5432/llmwatch_test (CI does this).
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
+
+
 @pytest.fixture
 async def db_engine(tmp_path):
-    """A fresh SQLite database file with the full schema.
+    """A fresh database with the full schema: a SQLite file, or TEST_DATABASE_URL.
 
     WHY: A file (WAL, real connection pool) like production, not one shared
     in-memory connection: concurrent sessions (eval runner workers) would interleave
-    their transactions on a single connection and lose writes.
+    their transactions on a single connection and lose writes. With
+    TEST_DATABASE_URL the schema is dropped and recreated for every test.
     """
     from llmwatch.db.engine import create_engine
     from llmwatch.db.models import Base
 
-    engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
+    engine = create_engine(
+        TEST_DATABASE_URL or f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
+    )
     async with engine.begin() as conn:
+        if TEST_DATABASE_URL:
+            await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()

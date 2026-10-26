@@ -2,6 +2,7 @@
 Tests for the database layer: schema, SQLite pragmas, workspace scoping, migrations.
 """
 
+import os
 import sqlite3
 from datetime import UTC, datetime
 
@@ -344,6 +345,63 @@ def test_migrations_match_the_models(tmp_path):
         diff = compare_metadata(ctx, Base.metadata)
     engine.dispose()
     assert diff == []
+
+
+requires_test_database = pytest.mark.skipif(
+    not os.environ.get("TEST_DATABASE_URL"),
+    reason="set TEST_DATABASE_URL to run migrations against that database",
+)
+
+
+def _run_on(url: str, fn):
+    """Runs fn(sync_connection) on url through the async engine (no sync driver
+    needed) and returns its result."""
+    import asyncio
+
+    async def go():
+        engine = create_engine(url)
+        try:
+            async with engine.begin() as conn:
+                return await conn.run_sync(fn)
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(go())
+
+
+@requires_test_database
+def test_migrations_on_test_database():
+    """Upgrade, downgrade and re-upgrade TEST_DATABASE_URL (Postgres in CI), then
+    check that the migrated schema matches the models."""
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+    from sqlalchemy import inspect
+
+    from llmwatch.db.migrate import downgrade, upgrade
+
+    url = os.environ["TEST_DATABASE_URL"]
+
+    def reset(conn):
+        # Start empty: other tests leave create_all tables behind.
+        Base.metadata.drop_all(conn)
+        conn.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
+
+    def tables(conn):
+        return set(inspect(conn).get_table_names())
+
+    def diff(conn):
+        ctx = MigrationContext.configure(conn, opts={"compare_type": True})
+        return compare_metadata(ctx, Base.metadata)
+
+    _run_on(url, reset)
+    upgrade(url)
+    assert _run_on(url, tables) == EXPECTED_TABLES | {"alembic_version"}
+
+    downgrade(url, "base")
+    assert _run_on(url, tables) == {"alembic_version"}
+
+    upgrade(url)
+    assert _run_on(url, diff) == []
 
 
 def test_app_startup_migrates_a_file_database(tmp_path, monkeypatch):

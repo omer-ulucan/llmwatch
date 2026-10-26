@@ -48,6 +48,7 @@ mlflow = ["mlflow>=2.14.1"]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
     "ruff>=0.6.0",
 ]
 
@@ -60,6 +61,14 @@ packages = ["src/llmwatch"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["llmwatch"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
