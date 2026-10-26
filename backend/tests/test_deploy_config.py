@@ -72,3 +72,12 @@ def test_the_suite_cannot_reach_the_network():
         pytest.raises(RuntimeError, match="must not use the network"),
     ):
         sock.connect(("203.0.113.1", 80))  # TEST-NET-3, never routed
+
+
+def test_backend_can_reach_services_on_the_docker_host():
+    # Ollama/LM Studio usually run on the host: OLLAMA_BASE_URL=
+    # http://host.docker.internal:11434/v1 only resolves on Linux with this entry.
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    assert "host.docker.internal:host-gateway" in compose["services"]["backend"].get(
+        "extra_hosts", []
+    )

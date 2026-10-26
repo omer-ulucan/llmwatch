@@ -20,6 +20,10 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12,192.168.0.0/16,10.0.0.0/8}
     volumes:
       - llmwatch_data:/data
+    # Lets the backend reach models served on the host (Ollama, LM Studio, vLLM):
+    # OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # Not published on the host: everything goes through the frontend's /api/.
     expose:
       - "8000"
