@@ -4,7 +4,7 @@
  * WHY: Separates HTTP concerns from UI components, making them easier to test and mock.
  */
 import { apiClient } from './client';
-import type { AgentTrace, AgentAnalytics } from '@/types';
+import type { AgentAnalytics, AgentToolInfo, AgentTrace } from '@/types';
 
 export const agentApi = {
   /**
@@ -24,11 +24,14 @@ export const agentApi = {
    * Fetch the tools this server allows (some, like code execution, are opt-in).
    */
   getTools: () =>
-    apiClient.get<{ tools: string[] }>('/agent/tools'),
+    apiClient.get<{ tools: string[]; details: AgentToolInfo[] }>('/agent/tools'),
 
   /**
    * Fetch aggregate agent metrics for the dashboard KPI cards.
    */
-  getAgentAnalytics: () =>
-    apiClient.get<AgentAnalytics>('/agent/analytics'),
+  getAgentAnalytics: (hours?: number) =>
+    apiClient.get<AgentAnalytics>('/agent/analytics', { params: hours ? { hours } : {} }),
+
+  /** Cancels a running agent run. */
+  cancel: (runId: string) => apiClient.post(`/agent/runs/${runId}/cancel`),
 };
