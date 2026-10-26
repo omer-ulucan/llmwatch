@@ -255,3 +255,13 @@ def add_model(app_db):
             return model
 
     return _add
+
+
+@pytest.fixture(autouse=True)
+def _reset_eval_limiters():
+    """Provider limiters hold asyncio primitives bound to one event loop."""
+    from llmwatch.evals import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()

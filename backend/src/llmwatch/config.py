@@ -87,6 +87,15 @@ class Settings(BaseSettings):
     demo_email: str = "demo@llmwatch.dev"
     demo_password: str = "llmwatch-demo"
 
+    # Eval runner
+    eval_max_retries: int = 5
+    eval_retry_base_s: float = 1.0
+    eval_retry_max_s: float = 30.0
+    # Per provider, across all runs in this process.
+    eval_provider_concurrency: int = 8
+    eval_provider_rpm: int = 600
+    eval_max_concurrency: int = 32
+
     # Rate limiting
     # WHY: Comma-separated CIDRs of reverse proxies whose X-Forwarded-For header is
     # trusted. Leave empty when the backend is reached directly; set it to the proxy
