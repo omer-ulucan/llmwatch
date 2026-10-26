@@ -1,5 +1,5 @@
 /**
- * The public pages must describe only what the project actually does: no
+ * The public pages and the README must describe only what the project actually does: no
  * compliance, uptime or savings claims, no made-up usage numbers, and no
  * references to the removed DynamoDB/AWS/LangChain stack.
  */
@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const PAGES = ['home.tsx', 'docs.tsx'];
+// Paths relative to src/routes.
+const PAGES = ['home.tsx', 'docs.tsx', '../../../README.md'];
 
 const BANNED: [RegExp, string][] = [
   [/SOC\s?2/i, 'SOC 2 claim'],
