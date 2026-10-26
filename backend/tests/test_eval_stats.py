@@ -315,6 +315,9 @@ async def test_baseline_marking_and_default_comparison(client, suite_and_runs):
         )
     ).json()
     assert body["baseline"]["id"] == base
+    # The UI links back to the suite from a comparison.
+    assert body["baseline"]["suite_id"] == suite["id"]
+    assert body["candidate"]["suite_id"] == suite["id"]
 
     cleared = await client.put(
         f"/evals/suites/{suite['id']}/baseline",

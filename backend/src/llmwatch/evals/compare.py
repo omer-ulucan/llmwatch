@@ -78,6 +78,7 @@ async def _case_summaries(session: AsyncSession, run_id: str) -> dict[str, CaseS
 def _run_info(run: EvalRun) -> dict[str, Any]:
     return {
         "id": run.id,
+        "suite_id": run.suite_id,
         "label": run.label,
         "status": run.status,
         "model": run.variant.get("model_label"),
