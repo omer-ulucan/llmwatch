@@ -94,6 +94,11 @@ class SuiteDefinition(BaseModel):
                 )
             if len(problems) >= 20:
                 break
+        if not problems:
+            # Imported here: evaluators import this module.
+            from llmwatch.evals.evaluators import validate_definition
+
+            problems = validate_definition(self)[:20]
         if problems:
             raise ValueError("; ".join(problems))
         return self
